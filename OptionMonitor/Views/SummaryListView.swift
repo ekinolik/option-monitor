@@ -154,6 +154,16 @@ struct SummaryListView: View {
 
 struct SummaryRowView: View {
     let summary: OptionSummary
+    @ObservedObject private var configService = ConfigService.shared
+    
+    private var backgroundColor: Color {
+        if summary.callPutRatio >= configService.callRatioThreshold {
+            return Color.green.opacity(0.15)
+        } else if summary.callPutRatio <= configService.putRatioThreshold {
+            return Color.red.opacity(0.15)
+        }
+        return Color.clear
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -196,6 +206,7 @@ struct SummaryRowView: View {
             }
         }
         .padding(.vertical, 6)
+        .background(backgroundColor)
     }
     
     private func formatTime(_ date: Date) -> String {

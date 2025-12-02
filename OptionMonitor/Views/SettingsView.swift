@@ -4,6 +4,8 @@ struct SettingsView: View {
     @ObservedObject private var configService = ConfigService.shared
     @State private var hostText: String = ""
     @State private var portText: String = ""
+    @State private var callRatioThresholdText: String = ""
+    @State private var putRatioThresholdText: String = ""
     @State private var showSaveConfirmation = false
     
     var body: some View {
@@ -22,6 +24,26 @@ struct SettingsView: View {
                     TextField("8080", text: $portText)
                         .keyboardType(.numberPad)
                 }
+            }
+            
+            Section(header: Text("Ratio Thresholds")) {
+                HStack {
+                    Text("Call Ratio Threshold")
+                    TextField("1.5", text: $callRatioThresholdText)
+                        .keyboardType(.numbersAndPunctuation)
+                        .multilineTextAlignment(.trailing)
+                }
+                
+                HStack {
+                    Text("Put Ratio Threshold")
+                    TextField("0.5", text: $putRatioThresholdText)
+                        .keyboardType(.numbersAndPunctuation)
+                        .multilineTextAlignment(.trailing)
+                }
+                
+                Text("Rows with call ratio ≥ threshold will be highlighted green. Rows with call ratio ≤ put threshold will be highlighted red.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
             
             Section(header: Text("Actions")) {
@@ -51,6 +73,8 @@ struct SettingsView: View {
         .onAppear {
             hostText = configService.host
             portText = configService.port
+            callRatioThresholdText = String(format: "%.2f", configService.callRatioThreshold)
+            putRatioThresholdText = String(format: "%.2f", configService.putRatioThreshold)
         }
         .alert("Settings Saved", isPresented: $showSaveConfirmation) {
             Button("OK", role: .cancel) { }
@@ -60,11 +84,15 @@ struct SettingsView: View {
     }
     
     private var isValidInput: Bool {
-        !hostText.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !portText.trimmingCharacters(in: .whitespaces).isEmpty &&
-        Int(portText) != nil &&
-        Int(portText)! > 0 &&
-        Int(portText)! <= 65535
+        let hostValid = !hostText.trimmingCharacters(in: .whitespaces).isEmpty
+        let portValid = !portText.trimmingCharacters(in: .whitespaces).isEmpty &&
+                       Int(portText) != nil &&
+                       Int(portText)! > 0 &&
+                       Int(portText)! <= 65535
+        let callRatioValid = Double(callRatioThresholdText.trimmingCharacters(in: .whitespaces)) != nil
+        let putRatioValid = Double(putRatioThresholdText.trimmingCharacters(in: .whitespaces)) != nil
+        
+        return hostValid && portValid && callRatioValid && putRatioValid
     }
     
     private func saveSettings() {
@@ -73,6 +101,14 @@ struct SettingsView: View {
         configService.host = hostText.trimmingCharacters(in: .whitespaces)
         configService.port = portText.trimmingCharacters(in: .whitespaces)
         
+        if let callRatio = Double(callRatioThresholdText.trimmingCharacters(in: .whitespaces)) {
+            configService.callRatioThreshold = callRatio
+        }
+        
+        if let putRatio = Double(putRatioThresholdText.trimmingCharacters(in: .whitespaces)) {
+            configService.putRatioThreshold = putRatio
+        }
+        
         showSaveConfirmation = true
     }
     
@@ -80,6 +116,8 @@ struct SettingsView: View {
         configService.resetToDefaults()
         hostText = configService.host
         portText = configService.port
+        callRatioThresholdText = String(format: "%.2f", configService.callRatioThreshold)
+        putRatioThresholdText = String(format: "%.2f", configService.putRatioThreshold)
     }
 }
 

@@ -5,9 +5,13 @@ class ConfigService: ObservableObject {
     
     private let hostKey = "websocket_host"
     private let portKey = "websocket_port"
+    private let callRatioThresholdKey = "call_ratio_threshold"
+    private let putRatioThresholdKey = "put_ratio_threshold"
     
     private let defaultHost = "localhost"
     private let defaultPort = "8080"
+    private let defaultCallRatioThreshold: Double = 1.5
+    private let defaultPutRatioThreshold: Double = 0.5
     
     @Published var host: String {
         didSet {
@@ -21,9 +25,34 @@ class ConfigService: ObservableObject {
         }
     }
     
+    @Published var callRatioThreshold: Double {
+        didSet {
+            UserDefaults.standard.set(callRatioThreshold, forKey: callRatioThresholdKey)
+        }
+    }
+    
+    @Published var putRatioThreshold: Double {
+        didSet {
+            UserDefaults.standard.set(putRatioThreshold, forKey: putRatioThresholdKey)
+        }
+    }
+    
     private init() {
         self.host = UserDefaults.standard.string(forKey: hostKey) ?? defaultHost
         self.port = UserDefaults.standard.string(forKey: portKey) ?? defaultPort
+        
+        // Load thresholds, defaulting if not set or invalid
+        if UserDefaults.standard.object(forKey: callRatioThresholdKey) != nil {
+            self.callRatioThreshold = UserDefaults.standard.double(forKey: callRatioThresholdKey)
+        } else {
+            self.callRatioThreshold = defaultCallRatioThreshold
+        }
+        
+        if UserDefaults.standard.object(forKey: putRatioThresholdKey) != nil {
+            self.putRatioThreshold = UserDefaults.standard.double(forKey: putRatioThresholdKey)
+        } else {
+            self.putRatioThreshold = defaultPutRatioThreshold
+        }
     }
     
     func getWebSocketURL() -> URL? {
@@ -38,6 +67,8 @@ class ConfigService: ObservableObject {
     func resetToDefaults() {
         host = defaultHost
         port = defaultPort
+        callRatioThreshold = defaultCallRatioThreshold
+        putRatioThreshold = defaultPutRatioThreshold
     }
 }
 

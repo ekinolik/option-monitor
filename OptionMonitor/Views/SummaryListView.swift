@@ -15,6 +15,7 @@ struct SummaryListView: View {
     @State private var selectedSummary: OptionSummary?
     @State private var sortOption: SortOption = .time
     @State private var showDatePicker = false
+    @State private var filterByThreshold = false
     
     var body: some View {
         NavigationView {
@@ -33,22 +34,31 @@ struct SummaryListView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Menu {
-                        ForEach(SortOption.allCases, id: \.self) { option in
-                            Button(action: {
-                                sortOption = option
-                            }) {
-                                HStack {
-                                    Text(option.rawValue)
-                                    if sortOption == option {
-                                        Spacer()
-                                        Image(systemName: "checkmark")
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            filterByThreshold.toggle()
+                        }) {
+                            Image(systemName: filterByThreshold ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                                .foregroundColor(filterByThreshold ? .blue : .primary)
+                        }
+                        
+                        Menu {
+                            ForEach(SortOption.allCases, id: \.self) { option in
+                                Button(action: {
+                                    sortOption = option
+                                }) {
+                                    HStack {
+                                        Text(option.rawValue)
+                                        if sortOption == option {
+                                            Spacer()
+                                            Image(systemName: "checkmark")
+                                        }
                                     }
                                 }
                             }
+                        } label: {
+                            Label("Sort", systemImage: "arrow.up.arrow.down")
                         }
-                    } label: {
-                        Label("Sort", systemImage: "arrow.up.arrow.down")
                     }
                 }
                 
@@ -178,18 +188,50 @@ struct SummaryListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
+    private func meetsThreshold(_ summary: OptionSummary) -> Bool {
+        // Check if summary meets any threshold (same logic as backgroundColor)
+        // Call ratio takes precedence
+        if summary.callPutRatio >= configService.callRatioThreshold {
+            return true
+        }
+        
+        if summary.callPutRatio <= configService.putRatioThreshold {
+            return true
+        }
+        
+        // If call ratio is between thresholds, check premium thresholds
+        let callPremiumExceeded = summary.callPremium >= configService.callPremiumThreshold
+        let putPremiumExceeded = summary.putPremium >= configService.putPremiumThreshold
+        
+        // If both premiums exceeded, highlight yellow
+        if callPremiumExceeded && putPremiumExceeded {
+            return true
+        }
+        
+        // If put premium exceeded (alone), highlight red
+        if putPremiumExceeded {
+            return true
+        }
+        
+        return false
+    }
+    
     private var sortedSummaries: [OptionSummary] {
+        let summaries = filterByThreshold 
+            ? webSocketService.summaries.filter { meetsThreshold($0) }
+            : webSocketService.summaries
+        
         switch sortOption {
         case .time:
-            return webSocketService.summaries.sorted { $0.periodStart > $1.periodStart }
+            return summaries.sorted { $0.periodStart > $1.periodStart }
         case .callRatio:
-            return webSocketService.summaries.sorted { $0.callPutRatio > $1.callPutRatio }
+            return summaries.sorted { $0.callPutRatio > $1.callPutRatio }
         case .totalPremium:
-            return webSocketService.summaries.sorted { $0.totalPremium > $1.totalPremium }
+            return summaries.sorted { $0.totalPremium > $1.totalPremium }
         case .callPremium:
-            return webSocketService.summaries.sorted { $0.callPremium > $1.callPremium }
+            return summaries.sorted { $0.callPremium > $1.callPremium }
         case .putPremium:
-            return webSocketService.summaries.sorted { $0.putPremium > $1.putPremium }
+            return summaries.sorted { $0.putPremium > $1.putPremium }
         }
     }
     

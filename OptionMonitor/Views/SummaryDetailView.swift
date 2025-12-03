@@ -1,8 +1,17 @@
 import SwiftUI
 
+enum TransactionSortOption: String, CaseIterable {
+    case premium = "Premium"
+    case volume = "Volume"
+}
+
 struct SummaryDetailView: View {
     let summary: OptionSummary
     @Environment(\.dismiss) var dismiss
+    @State private var transactions: [Transaction] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var sortOption: TransactionSortOption = .premium
     
     var body: some View {
         NavigationView {
@@ -29,6 +38,33 @@ struct SummaryDetailView: View {
                     // Ratio section
                     sectionHeader("Call/Put Ratio")
                     ratioSection
+                    
+                    Divider()
+                    
+                    // Transactions section
+                    HStack {
+                        sectionHeader("Transactions")
+                        Spacer()
+                        Menu {
+                            ForEach(TransactionSortOption.allCases, id: \.self) { option in
+                                Button(action: {
+                                    sortOption = option
+                                }) {
+                                    HStack {
+                                        Text(option.rawValue)
+                                        if sortOption == option {
+                                            Spacer()
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            Label("Sort", systemImage: "arrow.up.arrow.down")
+                                .font(.caption)
+                        }
+                    }
+                    transactionsSection
                 }
                 .padding()
             }
@@ -40,6 +76,9 @@ struct SummaryDetailView: View {
                         dismiss()
                     }
                 }
+            }
+            .onAppear {
+                fetchTransactions()
             }
         }
     }
@@ -139,6 +178,154 @@ struct SummaryDetailView: View {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+    
+    private func formatCurrency(_ amount: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: amount)) ?? "$0.00"
+    }
+    
+    private func formatNumber(_ number: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: number)) ?? "0"
+    }
+    
+    private var sortedTransactions: [Transaction] {
+        switch sortOption {
+        case .premium:
+            return transactions.sorted { 
+                ($0.volumeWeightedPrice * Double($0.volume) * 100.0) > 
+                ($1.volumeWeightedPrice * Double($1.volume) * 100.0) 
+            }
+        case .volume:
+            return transactions.sorted { $0.volume > $1.volume }
+        }
+    }
+    
+    private var transactionsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding()
+                    Spacer()
+                }
+            } else if let error = errorMessage {
+                Text("Error: \(error)")
+                    .foregroundColor(.red)
+                    .font(.caption)
+            } else if transactions.isEmpty {
+                Text("No transactions found")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            } else {
+                ForEach(sortedTransactions) { transaction in
+                    TransactionRowView(transaction: transaction)
+                        .padding(.vertical, 4)
+                    Divider()
+                }
+            }
+        }
+    }
+    
+    private func fetchTransactions() {
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                // Use the period start date and time
+                let date = summary.periodStart
+                let time = summary.periodStart
+                
+                let fetchedTransactions = try await TransactionService.shared.fetchTransactions(date: date, time: time)
+                
+                await MainActor.run {
+                    self.transactions = fetchedTransactions
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoading = false
+                }
+            }
+        }
+    }
+}
+
+struct TransactionRowView: View {
+    let transaction: Transaction
+    
+    private var premium: Double {
+        // Premium = VWAP * Volume * 100 (options contracts are typically 100 shares)
+        transaction.volumeWeightedPrice * Double(transaction.volume) * 100.0
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Symbol display: P/C Date Strike
+            if let details = transaction.optionDetails {
+                HStack {
+                    Text(details.optionType == "CALL" ? "C" : "P")
+                        .font(.headline)
+                        .foregroundColor(details.optionType == "CALL" ? .green : .red)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(details.optionType == "CALL" ? Color.green.opacity(0.1) : Color.red.opacity(0.1))
+                        .cornerRadius(4)
+                    
+                    Text(details.expiration)
+                        .font(.headline)
+                    
+                    Text(formatCurrency(details.strike))
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Spacer()
+                }
+            } else {
+                Text(transaction.symbol)
+                    .font(.headline)
+            }
+            
+            Divider()
+            
+            // Premium and key metrics
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Premium")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(formatCurrency(premium))
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("VWAP")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(formatCurrency(transaction.volumeWeightedPrice))
+                        .font(.subheadline)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Volume")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(formatNumber(transaction.volume))
+                        .font(.subheadline)
+                }
+                
+                Spacer()
+            }
+        }
+        .padding(.vertical, 4)
     }
     
     private func formatCurrency(_ amount: Double) -> String {

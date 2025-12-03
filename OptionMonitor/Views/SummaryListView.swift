@@ -11,6 +11,7 @@ enum SortOption: String, CaseIterable {
 struct SummaryListView: View {
     @StateObject private var webSocketService = WebSocketService()
     @ObservedObject private var configService = ConfigService.shared
+    @Environment(\.scenePhase) var scenePhase
     @State private var selectedSummary: OptionSummary?
     @State private var sortOption: SortOption = .time
     @State private var showDatePicker = false
@@ -54,6 +55,12 @@ struct SummaryListView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
                         Button(action: {
+                            webSocketService.reconnect()
+                        }) {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        
+                        Button(action: {
                             showDatePicker = true
                         }) {
                             Image(systemName: "calendar")
@@ -75,7 +82,10 @@ struct SummaryListView: View {
                 webSocketService.connect()
             }
             .onDisappear {
-                webSocketService.disconnect()
+                // Don't disconnect on disappear - let it stay connected in background
+            }
+            .onChange(of: scenePhase) { newPhase in
+                handleScenePhaseChange(newPhase)
             }
         }
     }
@@ -132,6 +142,24 @@ struct SummaryListView: View {
             return "AAPL Options"
         } else {
             return "AAPL Options - \(dateString)"
+        }
+    }
+    
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            // App became active - check if we need to reconnect
+            if case .disconnected = webSocketService.connectionStatus {
+                webSocketService.connect()
+            } else if case .error = webSocketService.connectionStatus {
+                // If there was an error, try to reconnect
+                webSocketService.reconnect()
+            }
+        case .background, .inactive:
+            // App went to background - keep connection but don't disconnect
+            break
+        @unknown default:
+            break
         }
     }
     

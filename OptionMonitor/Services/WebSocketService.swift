@@ -18,6 +18,7 @@ class WebSocketService: ObservableObject {
     private var urlSession: URLSession?
     private var reconnectTimer: Timer?
     private var shouldReconnect = false
+    private var shouldClearOnFirstMessage = false
     private let configService = ConfigService.shared
     private let notificationService = NotificationService.shared
     
@@ -45,10 +46,23 @@ class WebSocketService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     
     func connect() {
+        // If already connected or connecting, don't reconnect unless forced
         guard case .disconnected = connectionStatus else {
-            return // Already connecting or connected
+            return
         }
         
+        performConnection()
+    }
+    
+    func reconnect() {
+        // Force reconnection by disconnecting first, then connecting
+        disconnect()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.performConnection()
+        }
+    }
+    
+    private func performConnection() {
         guard let url = configService.getWebSocketURL() else {
             connectionStatus = .error("Invalid WebSocket URL")
             lastError = "Invalid WebSocket URL. Please check host and port settings."
@@ -57,6 +71,8 @@ class WebSocketService: ObservableObject {
         
         connectionStatus = .connecting
         shouldReconnect = true
+        // Mark that we should clear summaries when we receive the first message
+        shouldClearOnFirstMessage = true
         
         let session = URLSession(configuration: .default)
         let task = session.webSocketTask(with: url)
@@ -76,6 +92,7 @@ class WebSocketService: ObservableObject {
     
     func disconnect() {
         shouldReconnect = false
+        shouldClearOnFirstMessage = false
         reconnectTimer?.invalidate()
         reconnectTimer = nil
         webSocketTask?.cancel(with: .goingAway, reason: nil)
@@ -122,6 +139,12 @@ class WebSocketService: ObservableObject {
             let summary = try decoder.decode(OptionSummary.self, from: data)
             
             DispatchQueue.main.async {
+                // If this is the first message after a new connection, clear existing summaries
+                if self.shouldClearOnFirstMessage {
+                    self.summaries = []
+                    self.shouldClearOnFirstMessage = false
+                }
+                
                 // Check thresholds and send notifications if needed
                 self.checkThresholdsAndNotify(for: summary)
                 

@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import UserNotifications
 
 enum ConnectionStatus {
     case disconnected
@@ -18,18 +19,27 @@ class WebSocketService: ObservableObject {
     private var reconnectTimer: Timer?
     private var shouldReconnect = false
     private let configService = ConfigService.shared
+    private let notificationService = NotificationService.shared
     
     init() {
-        // Listen for config changes
-        Publishers.CombineLatest(configService.$host, configService.$port)
-            .sink { [weak self] _, _ in
-                // If connected, reconnect with new config
-                if case .connected = self?.connectionStatus {
-                    self?.disconnect()
-                    self?.connect()
+        // Listen for config changes (host, port, date)
+        Publishers.CombineLatest3(
+            configService.$host,
+            configService.$port,
+            configService.$selectedDate
+        )
+        .sink { [weak self] _, _, _ in
+            // If connected, reconnect with new config
+            if case .connected = self?.connectionStatus {
+                // Clear summaries when date changes
+                DispatchQueue.main.async {
+                    self?.summaries = []
                 }
+                self?.disconnect()
+                self?.connect()
             }
-            .store(in: &cancellables)
+        }
+        .store(in: &cancellables)
     }
     
     private var cancellables = Set<AnyCancellable>()
@@ -112,6 +122,9 @@ class WebSocketService: ObservableObject {
             let summary = try decoder.decode(OptionSummary.self, from: data)
             
             DispatchQueue.main.async {
+                // Check thresholds and send notifications if needed
+                self.checkThresholdsAndNotify(for: summary)
+                
                 // Insert at the beginning to show newest first
                 self.summaries.insert(summary, at: 0)
             }
@@ -157,6 +170,34 @@ class WebSocketService: ObservableObject {
                     self.handleError(error)
                 }
             }
+        }
+    }
+    
+    private func checkThresholdsAndNotify(for summary: OptionSummary) {
+        // Only send notifications if enabled
+        guard configService.notificationsEnabled else { return }
+        
+        // Call ratio takes precedence for notifications too
+        if summary.callPutRatio >= configService.callRatioThreshold {
+            notificationService.sendThresholdNotification(for: summary, thresholdType: .callRatioExceeded)
+            return // Don't check premium thresholds if ratio threshold is met
+        }
+        
+        if summary.callPutRatio <= configService.putRatioThreshold {
+            notificationService.sendThresholdNotification(for: summary, thresholdType: .putRatioBelow)
+            return // Don't check premium thresholds if ratio threshold is met
+        }
+        
+        // If call ratio thresholds not met, check premium thresholds
+        let callPremiumExceeded = summary.callPremium >= configService.callPremiumThreshold
+        let putPremiumExceeded = summary.putPremium >= configService.putPremiumThreshold
+        
+        if callPremiumExceeded && putPremiumExceeded {
+            notificationService.sendThresholdNotification(for: summary, thresholdType: .bothPremiumsExceeded)
+        } else if callPremiumExceeded {
+            notificationService.sendThresholdNotification(for: summary, thresholdType: .callPremiumExceeded)
+        } else if putPremiumExceeded {
+            notificationService.sendThresholdNotification(for: summary, thresholdType: .putPremiumExceeded)
         }
     }
 }

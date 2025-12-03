@@ -4,6 +4,11 @@ import SwiftUI
 struct OptionMonitorApp: App {
     @Environment(\.scenePhase) var scenePhase
     
+    init() {
+        // Request notification permissions on app launch
+        NotificationService.shared.requestAuthorization()
+    }
+    
     var body: some Scene {
         WindowGroup {
             SummaryListView()

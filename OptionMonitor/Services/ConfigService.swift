@@ -7,11 +7,18 @@ class ConfigService: ObservableObject {
     private let portKey = "websocket_port"
     private let callRatioThresholdKey = "call_ratio_threshold"
     private let putRatioThresholdKey = "put_ratio_threshold"
+    private let callPremiumThresholdKey = "call_premium_threshold"
+    private let putPremiumThresholdKey = "put_premium_threshold"
+    private let notificationsEnabledKey = "notifications_enabled"
+    private let selectedDateKey = "selected_date"
     
     private let defaultHost = "localhost"
     private let defaultPort = "8080"
     private let defaultCallRatioThreshold: Double = 1.5
     private let defaultPutRatioThreshold: Double = 0.5
+    private let defaultCallPremiumThreshold: Double = 1000000.0
+    private let defaultPutPremiumThreshold: Double = 50000.0
+    private let defaultNotificationsEnabled: Bool = true
     
     @Published var host: String {
         didSet {
@@ -37,6 +44,30 @@ class ConfigService: ObservableObject {
         }
     }
     
+    @Published var callPremiumThreshold: Double {
+        didSet {
+            UserDefaults.standard.set(callPremiumThreshold, forKey: callPremiumThresholdKey)
+        }
+    }
+    
+    @Published var putPremiumThreshold: Double {
+        didSet {
+            UserDefaults.standard.set(putPremiumThreshold, forKey: putPremiumThresholdKey)
+        }
+    }
+    
+    @Published var notificationsEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(notificationsEnabled, forKey: notificationsEnabledKey)
+        }
+    }
+    
+    @Published var selectedDate: Date {
+        didSet {
+            UserDefaults.standard.set(selectedDate, forKey: selectedDateKey)
+        }
+    }
+    
     private init() {
         self.host = UserDefaults.standard.string(forKey: hostKey) ?? defaultHost
         self.port = UserDefaults.standard.string(forKey: portKey) ?? defaultPort
@@ -53,6 +84,27 @@ class ConfigService: ObservableObject {
         } else {
             self.putRatioThreshold = defaultPutRatioThreshold
         }
+        
+        if UserDefaults.standard.object(forKey: callPremiumThresholdKey) != nil {
+            self.callPremiumThreshold = UserDefaults.standard.double(forKey: callPremiumThresholdKey)
+        } else {
+            self.callPremiumThreshold = defaultCallPremiumThreshold
+        }
+        
+        if UserDefaults.standard.object(forKey: putPremiumThresholdKey) != nil {
+            self.putPremiumThreshold = UserDefaults.standard.double(forKey: putPremiumThresholdKey)
+        } else {
+            self.putPremiumThreshold = defaultPutPremiumThreshold
+        }
+        
+        self.notificationsEnabled = UserDefaults.standard.object(forKey: notificationsEnabledKey) as? Bool ?? defaultNotificationsEnabled
+        
+        // Load selected date, defaulting to today if not set
+        if let savedDate = UserDefaults.standard.object(forKey: selectedDateKey) as? Date {
+            self.selectedDate = savedDate
+        } else {
+            self.selectedDate = Date()
+        }
     }
     
     func getWebSocketURL() -> URL? {
@@ -61,6 +113,13 @@ class ConfigService: ObservableObject {
         components.host = host
         components.port = Int(port)
         components.path = "/analyze"
+        
+        // Add date query parameter in YYYY-MM-DD format
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: selectedDate)
+        components.queryItems = [URLQueryItem(name: "date", value: dateString)]
+        
         return components.url
     }
     
@@ -69,6 +128,8 @@ class ConfigService: ObservableObject {
         port = defaultPort
         callRatioThreshold = defaultCallRatioThreshold
         putRatioThreshold = defaultPutRatioThreshold
+        callPremiumThreshold = defaultCallPremiumThreshold
+        putPremiumThreshold = defaultPutPremiumThreshold
     }
 }
 

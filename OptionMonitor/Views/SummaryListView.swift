@@ -10,8 +10,10 @@ enum SortOption: String, CaseIterable {
 
 struct SummaryListView: View {
     @StateObject private var webSocketService = WebSocketService()
+    @ObservedObject private var configService = ConfigService.shared
     @State private var selectedSummary: OptionSummary?
     @State private var sortOption: SortOption = .time
+    @State private var showDatePicker = false
     
     var body: some View {
         NavigationView {
@@ -26,7 +28,7 @@ struct SummaryListView: View {
                     listView
                 }
             }
-            .navigationTitle("AAPL Options")
+            .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -50,13 +52,24 @@ struct SummaryListView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: SettingsView()) {
-                        Image(systemName: "gearshape")
+                    HStack(spacing: 16) {
+                        Button(action: {
+                            showDatePicker = true
+                        }) {
+                            Image(systemName: "calendar")
+                        }
+                        
+                        NavigationLink(destination: SettingsView()) {
+                            Image(systemName: "gearshape")
+                        }
                     }
                 }
             }
             .sheet(item: $selectedSummary) { summary in
                 SummaryDetailView(summary: summary)
+            }
+            .sheet(isPresented: $showDatePicker) {
+                DatePickerSheet(selectedDate: $configService.selectedDate, isPresented: $showDatePicker)
             }
             .onAppear {
                 webSocketService.connect()
@@ -105,6 +118,20 @@ struct SummaryListView: View {
             return "Disconnected"
         case .error(let message):
             return "Error: \(message)"
+        }
+    }
+    
+    private var navigationTitle: String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMM d, yyyy"
+        let dateString = dateFormatter.string(from: configService.selectedDate)
+        
+        // Check if selected date is today
+        let calendar = Calendar.current
+        if calendar.isDateInToday(configService.selectedDate) {
+            return "AAPL Options"
+        } else {
+            return "AAPL Options - \(dateString)"
         }
     }
     
@@ -157,11 +184,29 @@ struct SummaryRowView: View {
     @ObservedObject private var configService = ConfigService.shared
     
     private var backgroundColor: Color {
+        // Call ratio takes precedence - check if it should be green or red
         if summary.callPutRatio >= configService.callRatioThreshold {
             return Color.green.opacity(0.15)
-        } else if summary.callPutRatio <= configService.putRatioThreshold {
+        }
+        
+        if summary.callPutRatio <= configService.putRatioThreshold {
             return Color.red.opacity(0.15)
         }
+        
+        // If call ratio is between thresholds (not highlighted by ratio), check premium thresholds
+        let callPremiumExceeded = summary.callPremium >= configService.callPremiumThreshold
+        let putPremiumExceeded = summary.putPremium >= configService.putPremiumThreshold
+        
+        // If both premiums exceeded, highlight yellow
+        if callPremiumExceeded && putPremiumExceeded {
+            return Color.yellow.opacity(0.15)
+        }
+        
+        // If put premium exceeded (alone), highlight red
+        if putPremiumExceeded {
+            return Color.red.opacity(0.15)
+        }
+        
         return Color.clear
     }
     
@@ -226,6 +271,32 @@ struct SummaryRowView: View {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         return formatter.string(from: NSNumber(value: number)) ?? "0"
+    }
+}
+
+struct DatePickerSheet: View {
+    @Binding var selectedDate: Date
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                DatePicker("Select Date", selection: $selectedDate, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .padding()
+                
+                Spacer()
+            }
+            .navigationTitle("Select Date")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        isPresented = false
+                    }
+                }
+            }
+        }
     }
 }
 

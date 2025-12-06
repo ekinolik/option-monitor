@@ -33,6 +33,12 @@ struct SummaryListView: View {
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    if !webSocketService.summaries.isEmpty {
+                        ratiosHeader
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarLeading) {
                     HStack(spacing: 12) {
                         Button(action: {
@@ -113,6 +119,83 @@ struct SummaryListView: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(Color(.systemGray6))
+    }
+    
+    private var ratiosHeader: some View {
+        HStack(spacing: 16) {
+            ratioItem(label: "15m", ratio: fifteenMinuteRatio)
+            ratioItem(label: "1h", ratio: oneHourRatio)
+            ratioItem(label: "Day", ratio: allDayRatio)
+        }
+    }
+    
+    private func ratioItem(label: String, ratio: Double?) -> some View {
+        VStack(spacing: 2) {
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            if let ratio = ratio {
+                Text(String(format: "%.2f", ratio))
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(ratioColor(for: ratio))
+            } else {
+                Text("--")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+    
+    private func ratioColor(for ratio: Double) -> Color {
+        if ratio < 2.0 {
+            return .red
+        } else if ratio < 4.0 {
+            return .orange
+        } else if ratio < 6.0 {
+            return Color(red: 0.0, green: 0.5, blue: 0.0) // Dark green
+        } else {
+            return .green // Bright green
+        }
+    }
+    
+    private var fifteenMinuteRatio: Double? {
+        calculateRatio(for: 15 * 60) // 15 minutes in seconds
+    }
+    
+    private var oneHourRatio: Double? {
+        calculateRatio(for: 60 * 60) // 1 hour in seconds
+    }
+    
+    private var allDayRatio: Double? {
+        calculateRatio(for: nil) // nil means all day
+    }
+    
+    private func calculateRatio(for timeWindowSeconds: Int?) -> Double? {
+        let now = Date()
+        let cutoffDate: Date?
+        
+        if let seconds = timeWindowSeconds {
+            cutoffDate = now.addingTimeInterval(-Double(seconds))
+        } else {
+            cutoffDate = nil // All day
+        }
+        
+        let relevantSummaries: [OptionSummary]
+        if let cutoff = cutoffDate {
+            relevantSummaries = webSocketService.summaries.filter { $0.periodStart >= cutoff }
+        } else {
+            relevantSummaries = webSocketService.summaries
+        }
+        
+        guard !relevantSummaries.isEmpty else { return nil }
+        
+        let totalCallVolume = relevantSummaries.reduce(0) { $0 + $1.callVolume }
+        let totalPutVolume = relevantSummaries.reduce(0) { $0 + $1.putVolume }
+        
+        guard totalPutVolume > 0 else { return nil }
+        
+        return Double(totalCallVolume) / Double(totalPutVolume)
     }
     
     private var statusColor: Color {

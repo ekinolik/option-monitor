@@ -30,14 +30,18 @@ class WebSocketService: ObservableObject {
             configService.$selectedDate
         )
         .sink { [weak self] _, _, _ in
-            // If connected, reconnect with new config
-            if case .connected = self?.connectionStatus {
-                // Clear summaries when date changes
-                DispatchQueue.main.async {
-                    self?.summaries = []
-                }
-                self?.disconnect()
-                self?.connect()
+            // Always reconnect when config changes, regardless of current state
+            guard let self = self else { return }
+            
+            // Clear summaries when config changes
+            DispatchQueue.main.async {
+                self.summaries = []
+            }
+            
+            // Disconnect and reconnect
+            self.disconnect()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.reconnect()
             }
         }
         .store(in: &cancellables)
@@ -63,6 +67,11 @@ class WebSocketService: ObservableObject {
     }
     
     private func performConnection() {
+        // Disconnect existing connection first if any
+        if webSocketTask != nil {
+            disconnect()
+        }
+        
         guard let url = configService.getWebSocketURL() else {
             connectionStatus = .error("Invalid WebSocket URL")
             lastError = "Invalid WebSocket URL. Please check host and port settings."

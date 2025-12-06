@@ -9,6 +9,7 @@ class ConfigService: ObservableObject {
     private let putRatioThresholdKey = "put_ratio_threshold"
     private let callPremiumThresholdKey = "call_premium_threshold"
     private let putPremiumThresholdKey = "put_premium_threshold"
+    private let totalPremiumThresholdKey = "total_premium_threshold"
     private let notificationsEnabledKey = "notifications_enabled"
     private let selectedDateKey = "selected_date"
     
@@ -18,6 +19,7 @@ class ConfigService: ObservableObject {
     private let defaultPutRatioThreshold: Double = 0.5
     private let defaultCallPremiumThreshold: Double = 1000000.0
     private let defaultPutPremiumThreshold: Double = 50000.0
+    private let defaultTotalPremiumThreshold: Double = 1000000.0
     private let defaultNotificationsEnabled: Bool = true
     
     @Published var host: String {
@@ -53,6 +55,12 @@ class ConfigService: ObservableObject {
     @Published var putPremiumThreshold: Double {
         didSet {
             UserDefaults.standard.set(putPremiumThreshold, forKey: putPremiumThresholdKey)
+        }
+    }
+    
+    @Published var totalPremiumThreshold: Double {
+        didSet {
+            UserDefaults.standard.set(totalPremiumThreshold, forKey: totalPremiumThresholdKey)
         }
     }
     
@@ -97,6 +105,12 @@ class ConfigService: ObservableObject {
             self.putPremiumThreshold = defaultPutPremiumThreshold
         }
         
+        if UserDefaults.standard.object(forKey: totalPremiumThresholdKey) != nil {
+            self.totalPremiumThreshold = UserDefaults.standard.double(forKey: totalPremiumThresholdKey)
+        } else {
+            self.totalPremiumThreshold = defaultTotalPremiumThreshold
+        }
+        
         self.notificationsEnabled = UserDefaults.standard.object(forKey: notificationsEnabledKey) as? Bool ?? defaultNotificationsEnabled
         
         // Load selected date, defaulting to today if not set
@@ -130,6 +144,7 @@ class ConfigService: ObservableObject {
         putRatioThreshold = defaultPutRatioThreshold
         callPremiumThreshold = defaultCallPremiumThreshold
         putPremiumThreshold = defaultPutPremiumThreshold
+        totalPremiumThreshold = defaultTotalPremiumThreshold
     }
 }
 

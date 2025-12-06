@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var putRatioThresholdText: String = ""
     @State private var callPremiumThresholdText: String = ""
     @State private var putPremiumThresholdText: String = ""
+    @State private var totalPremiumThresholdText: String = ""
     @State private var showSaveConfirmation = false
     
     var body: some View {
@@ -42,6 +43,17 @@ struct SettingsView: View {
                         .keyboardType(.numbersAndPunctuation)
                         .multilineTextAlignment(.trailing)
                 }
+                
+                HStack {
+                    Text("Total Premium Threshold")
+                    TextField("1000000", text: $totalPremiumThresholdText)
+                        .keyboardType(.numbersAndPunctuation)
+                        .multilineTextAlignment(.trailing)
+                }
+                
+                Text("Ratio threshold highlighting only applies if total premium ≥ total premium threshold.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 
                 Toggle("Enable Notifications", isOn: $configService.notificationsEnabled)
                 
@@ -101,6 +113,7 @@ struct SettingsView: View {
             putRatioThresholdText = String(format: "%.2f", configService.putRatioThreshold)
             callPremiumThresholdText = String(format: "%.0f", configService.callPremiumThreshold)
             putPremiumThresholdText = String(format: "%.0f", configService.putPremiumThreshold)
+            totalPremiumThresholdText = String(format: "%.0f", configService.totalPremiumThreshold)
         }
         .alert("Settings Saved", isPresented: $showSaveConfirmation) {
             Button("OK", role: .cancel) { }
@@ -119,8 +132,9 @@ struct SettingsView: View {
         let putRatioValid = Double(putRatioThresholdText.trimmingCharacters(in: .whitespaces)) != nil
         let callPremiumValid = Double(callPremiumThresholdText.trimmingCharacters(in: .whitespaces)) != nil
         let putPremiumValid = Double(putPremiumThresholdText.trimmingCharacters(in: .whitespaces)) != nil
+        let totalPremiumValid = Double(totalPremiumThresholdText.trimmingCharacters(in: .whitespaces)) != nil
         
-        return hostValid && portValid && callRatioValid && putRatioValid && callPremiumValid && putPremiumValid
+        return hostValid && portValid && callRatioValid && putRatioValid && callPremiumValid && putPremiumValid && totalPremiumValid
     }
     
     private func saveSettings() {
@@ -145,6 +159,10 @@ struct SettingsView: View {
             configService.putPremiumThreshold = putPremium
         }
         
+        if let totalPremium = Double(totalPremiumThresholdText.trimmingCharacters(in: .whitespaces)) {
+            configService.totalPremiumThreshold = totalPremium
+        }
+        
         showSaveConfirmation = true
     }
     
@@ -156,6 +174,7 @@ struct SettingsView: View {
         putRatioThresholdText = String(format: "%.2f", configService.putRatioThreshold)
         callPremiumThresholdText = String(format: "%.0f", configService.callPremiumThreshold)
         putPremiumThresholdText = String(format: "%.0f", configService.putPremiumThreshold)
+        totalPremiumThresholdText = String(format: "%.0f", configService.totalPremiumThreshold)
     }
 }
 

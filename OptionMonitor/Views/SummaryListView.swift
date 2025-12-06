@@ -275,11 +275,13 @@ struct SummaryListView: View {
         // Check if summary meets any threshold (same logic as backgroundColor)
         if summary.callPremium >= configService.callPremiumThreshold {
             return true
-        } else if summary.callPutRatio >= configService.callRatioThreshold {
+        } else if summary.callPutRatio >= configService.callRatioThreshold &&
+                  summary.totalPremium >= configService.totalPremiumThreshold {
             return true
         } else if summary.putPremium >= configService.putPremiumThreshold {
             return true
-        } else if summary.callPutRatio <= configService.putRatioThreshold {
+        } else if summary.callPutRatio <= configService.putRatioThreshold &&
+                  summary.totalPremium >= configService.totalPremiumThreshold {
             return true
         }
         
@@ -327,11 +329,13 @@ struct SummaryRowView: View {
         // Check thresholds in priority order
         if summary.callPremium >= configService.callPremiumThreshold {
             return Color.green.opacity(0.15)
-        } else if summary.callPutRatio >= configService.callRatioThreshold {
+        } else if summary.callPutRatio >= configService.callRatioThreshold &&
+                  summary.totalPremium >= configService.totalPremiumThreshold {
             return Color.green.opacity(0.15)
         } else if summary.putPremium >= configService.putPremiumThreshold {
             return Color.red.opacity(0.15)
-        } else if summary.callPutRatio <= configService.putRatioThreshold {
+        } else if summary.callPutRatio <= configService.putRatioThreshold &&
+                  summary.totalPremium >= configService.totalPremiumThreshold {
             return Color.red.opacity(0.15)
         }
         

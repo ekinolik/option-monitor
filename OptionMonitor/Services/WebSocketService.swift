@@ -23,13 +23,14 @@ class WebSocketService: ObservableObject {
     private let notificationService = NotificationService.shared
     
     init() {
-        // Listen for config changes (host, port, date)
-        Publishers.CombineLatest3(
+        // Listen for config changes (host, port, date, ticker)
+        Publishers.CombineLatest4(
             configService.$host,
             configService.$port,
-            configService.$selectedDate
+            configService.$selectedDate,
+            configService.$ticker
         )
-        .sink { [weak self] _, _, _ in
+        .sink { [weak self] _, _, _, _ in
             // Always reconnect when config changes, regardless of current state
             guard let self = self else { return }
             

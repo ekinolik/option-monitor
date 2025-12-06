@@ -15,12 +15,16 @@ struct SummaryListView: View {
     @State private var selectedSummary: OptionSummary?
     @State private var sortOption: SortOption = .time
     @State private var showDatePicker = false
+    @State private var showTickerPicker = false
     @State private var filterByThreshold = false
     
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Connection status bar
+                // Header row 2: Ticker and date
+                tickerAndDateHeader
+                
+                // Header row 3: Connection status bar
                 connectionStatusBar
                 
                 // List of summaries
@@ -30,8 +34,8 @@ struct SummaryListView: View {
                     listView
                 }
             }
-            .navigationTitle(navigationTitle)
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     if !webSocketService.summaries.isEmpty {
@@ -94,6 +98,9 @@ struct SummaryListView: View {
             .sheet(isPresented: $showDatePicker) {
                 DatePickerSheet(selectedDate: $configService.selectedDate, isPresented: $showDatePicker)
             }
+            .sheet(isPresented: $showTickerPicker) {
+                TickerPickerSheet(ticker: $configService.ticker, isPresented: $showTickerPicker)
+            }
             .onAppear {
                 webSocketService.connect()
             }
@@ -104,6 +111,42 @@ struct SummaryListView: View {
                 handleScenePhaseChange(newPhase)
             }
         }
+    }
+    
+    private var tickerAndDateHeader: some View {
+        HStack {
+            Button(action: {
+                showTickerPicker = true
+            }) {
+                HStack(spacing: 4) {
+                    Text(configService.ticker)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .foregroundColor(.primary)
+            
+            Text(" - ")
+                .foregroundColor(.secondary)
+            
+            Text(formatDate(configService.selectedDate))
+                .font(.title2)
+                .foregroundColor(.secondary)
+            
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color(.systemGray6))
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d, yyyy"
+        return formatter.string(from: date)
     }
     
     private var connectionStatusBar: some View {
@@ -224,19 +267,6 @@ struct SummaryListView: View {
         }
     }
     
-    private var navigationTitle: String {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "MMM d, yyyy"
-        let dateString = dateFormatter.string(from: configService.selectedDate)
-        
-        // Check if selected date is today
-        let calendar = Calendar.current
-        if calendar.isDateInToday(configService.selectedDate) {
-            return "AAPL Options"
-        } else {
-            return "AAPL Options - \(dateString)"
-        }
-    }
     
     private func handleScenePhaseChange(_ phase: ScenePhase) {
         switch phase {
@@ -427,6 +457,58 @@ struct DatePickerSheet: View {
                         isPresented = false
                     }
                 }
+            }
+        }
+    }
+}
+
+struct TickerPickerSheet: View {
+    @Binding var ticker: String
+    @Binding var isPresented: Bool
+    @State private var tickerText: String = ""
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Current Ticker")) {
+                    HStack {
+                        Text(ticker)
+                            .font(.headline)
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                }
+                
+                Section(header: Text("New Ticker Symbol")) {
+                    TextField("AAPL", text: $tickerText)
+                        .keyboardType(.default)
+                        .autocapitalization(.allCharacters)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.characters)
+                }
+            }
+            .navigationTitle("Change Ticker")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        isPresented = false
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        let trimmed = tickerText.trimmingCharacters(in: .whitespaces).uppercased()
+                        if !trimmed.isEmpty {
+                            ticker = trimmed
+                        }
+                        isPresented = false
+                    }
+                    .disabled(tickerText.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .onAppear {
+                tickerText = ticker
             }
         }
     }

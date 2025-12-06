@@ -62,7 +62,8 @@ class TransactionService {
         
         components.queryItems = [
             URLQueryItem(name: "date", value: dateString),
-            URLQueryItem(name: "time", value: timeString)
+            URLQueryItem(name: "time", value: timeString),
+            URLQueryItem(name: "ticker", value: configService.ticker.uppercased())
         ]
         
         return components.url

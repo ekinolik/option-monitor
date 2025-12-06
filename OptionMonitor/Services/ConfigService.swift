@@ -12,6 +12,7 @@ class ConfigService: ObservableObject {
     private let totalPremiumThresholdKey = "total_premium_threshold"
     private let notificationsEnabledKey = "notifications_enabled"
     private let selectedDateKey = "selected_date"
+    private let tickerKey = "ticker"
     
     private let defaultHost = "localhost"
     private let defaultPort = "8080"
@@ -21,6 +22,7 @@ class ConfigService: ObservableObject {
     private let defaultPutPremiumThreshold: Double = 50000.0
     private let defaultTotalPremiumThreshold: Double = 1000000.0
     private let defaultNotificationsEnabled: Bool = true
+    private let defaultTicker = "AAPL"
     
     @Published var host: String {
         didSet {
@@ -76,6 +78,12 @@ class ConfigService: ObservableObject {
         }
     }
     
+    @Published var ticker: String {
+        didSet {
+            UserDefaults.standard.set(ticker.uppercased(), forKey: tickerKey)
+        }
+    }
+    
     private init() {
         self.host = UserDefaults.standard.string(forKey: hostKey) ?? defaultHost
         self.port = UserDefaults.standard.string(forKey: portKey) ?? defaultPort
@@ -119,6 +127,13 @@ class ConfigService: ObservableObject {
         } else {
             self.selectedDate = Date()
         }
+        
+        // Load ticker, defaulting to AAPL if not set
+        if let savedTicker = UserDefaults.standard.string(forKey: tickerKey), !savedTicker.isEmpty {
+            self.ticker = savedTicker.uppercased()
+        } else {
+            self.ticker = defaultTicker
+        }
     }
     
     func getWebSocketURL() -> URL? {
@@ -141,11 +156,14 @@ class ConfigService: ObservableObject {
         }
         components.path = "/analyze"
         
-        // Add date query parameter in YYYY-MM-DD format
+        // Add date and ticker query parameters
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         let dateString = dateFormatter.string(from: selectedDate)
-        components.queryItems = [URLQueryItem(name: "date", value: dateString)]
+        components.queryItems = [
+            URLQueryItem(name: "date", value: dateString),
+            URLQueryItem(name: "ticker", value: ticker.uppercased())
+        ]
         
         return components.url
     }
@@ -158,6 +176,7 @@ class ConfigService: ObservableObject {
         callPremiumThreshold = defaultCallPremiumThreshold
         putPremiumThreshold = defaultPutPremiumThreshold
         totalPremiumThreshold = defaultTotalPremiumThreshold
+        ticker = defaultTicker
     }
 }
 

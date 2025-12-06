@@ -273,26 +273,13 @@ struct SummaryListView: View {
     
     private func meetsThreshold(_ summary: OptionSummary) -> Bool {
         // Check if summary meets any threshold (same logic as backgroundColor)
-        // Call ratio takes precedence
-        if summary.callPutRatio >= configService.callRatioThreshold {
+        if summary.callPremium >= configService.callPremiumThreshold {
             return true
-        }
-        
-        if summary.callPutRatio <= configService.putRatioThreshold {
+        } else if summary.callPutRatio >= configService.callRatioThreshold {
             return true
-        }
-        
-        // If call ratio is between thresholds, check premium thresholds
-        let callPremiumExceeded = summary.callPremium >= configService.callPremiumThreshold
-        let putPremiumExceeded = summary.putPremium >= configService.putPremiumThreshold
-        
-        // If both premiums exceeded, highlight yellow
-        if callPremiumExceeded && putPremiumExceeded {
+        } else if summary.putPremium >= configService.putPremiumThreshold {
             return true
-        }
-        
-        // If put premium exceeded (alone), highlight red
-        if putPremiumExceeded {
+        } else if summary.callPutRatio <= configService.putRatioThreshold {
             return true
         }
         
@@ -337,26 +324,14 @@ struct SummaryRowView: View {
     @ObservedObject private var configService = ConfigService.shared
     
     private var backgroundColor: Color {
-        // Call ratio takes precedence - check if it should be green or red
-        if summary.callPutRatio >= configService.callRatioThreshold {
+        // Check thresholds in priority order
+        if summary.callPremium >= configService.callPremiumThreshold {
             return Color.green.opacity(0.15)
-        }
-        
-        if summary.callPutRatio <= configService.putRatioThreshold {
+        } else if summary.callPutRatio >= configService.callRatioThreshold {
+            return Color.green.opacity(0.15)
+        } else if summary.putPremium >= configService.putPremiumThreshold {
             return Color.red.opacity(0.15)
-        }
-        
-        // If call ratio is between thresholds (not highlighted by ratio), check premium thresholds
-        let callPremiumExceeded = summary.callPremium >= configService.callPremiumThreshold
-        let putPremiumExceeded = summary.putPremium >= configService.putPremiumThreshold
-        
-        // If both premiums exceeded, highlight yellow
-        if callPremiumExceeded && putPremiumExceeded {
-            return Color.yellow.opacity(0.15)
-        }
-        
-        // If put premium exceeded (alone), highlight red
-        if putPremiumExceeded {
+        } else if summary.callPutRatio <= configService.putRatioThreshold {
             return Color.red.opacity(0.15)
         }
         

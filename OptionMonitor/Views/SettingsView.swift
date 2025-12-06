@@ -45,13 +45,14 @@ struct SettingsView: View {
                 }
                 
                 HStack {
-                    Text("Total Premium Threshold")
+                    Text("Ratio Premium Threshold")
+                        .frame(minWidth: 220, alignment: .leading)
                     TextField("1000000", text: $totalPremiumThresholdText)
                         .keyboardType(.numbersAndPunctuation)
                         .multilineTextAlignment(.trailing)
                 }
                 
-                Text("Ratio threshold highlighting only applies if total premium ≥ total premium threshold.")
+                Text("Ratio threshold highlighting only applies if total premium ≥ ratio premium threshold.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 

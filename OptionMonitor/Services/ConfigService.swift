@@ -123,9 +123,22 @@ class ConfigService: ObservableObject {
     
     func getWebSocketURL() -> URL? {
         var components = URLComponents()
-        components.scheme = "ws"
+        
+        // Use wss (WebSocket Secure) for HTTPS, ws for localhost
+        if host.contains("localhost") || host.contains("127.0.0.1") {
+            components.scheme = "ws"
+        } else {
+            components.scheme = "wss"
+        }
+        
         components.host = host
-        components.port = Int(port)
+        // Only set port if it's not the default for the scheme
+        if let portInt = Int(port) {
+            let defaultPort = components.scheme == "wss" ? 443 : 80
+            if portInt != defaultPort {
+                components.port = portInt
+            }
+        }
         components.path = "/analyze"
         
         // Add date query parameter in YYYY-MM-DD format

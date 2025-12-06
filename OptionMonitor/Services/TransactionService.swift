@@ -32,8 +32,8 @@ class TransactionService {
         if host.contains("localhost") || host.contains("127.0.0.1") {
             components.scheme = "http"
         } else {
-            // Use https for remote hosts, http for local
-            components.scheme = "http" // Update to https if your server uses SSL
+            // Use https for remote hosts
+            components.scheme = "https"
         }
         
         components.host = host

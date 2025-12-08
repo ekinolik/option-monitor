@@ -16,6 +16,7 @@ struct SummaryListView: View {
     @State private var sortOption: SortOption = .time
     @State private var showDatePicker = false
     @State private var showTickerPicker = false
+    @State private var showThresholdSettings = false
     @State private var filterByThreshold = false
     
     var body: some View {
@@ -86,7 +87,7 @@ struct SummaryListView: View {
                             Image(systemName: "calendar")
                         }
                         
-                        NavigationLink(destination: SettingsView()) {
+                        NavigationLink(destination: ServerSettingsView()) {
                             Image(systemName: "gearshape")
                         }
                     }
@@ -100,6 +101,11 @@ struct SummaryListView: View {
             }
             .sheet(isPresented: $showTickerPicker) {
                 TickerPickerSheet(ticker: $configService.ticker, isPresented: $showTickerPicker)
+            }
+            .sheet(isPresented: $showThresholdSettings) {
+                NavigationView {
+                    ThresholdSettingsView()
+                }
             }
             .onAppear {
                 webSocketService.connect()
@@ -128,6 +134,14 @@ struct SummaryListView: View {
                 }
             }
             .foregroundColor(.primary)
+            
+            Button(action: {
+                showThresholdSettings = true
+            }) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+            }
             
             Text(" - ")
                 .foregroundColor(.secondary)
@@ -470,16 +484,7 @@ struct TickerPickerSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Current Ticker")) {
-                    HStack {
-                        Text(ticker)
-                            .font(.headline)
-                        Spacer()
-                    }
-                    .padding(.vertical, 4)
-                }
-                
-                Section(header: Text("New Ticker Symbol")) {
+                Section(header: Text("Ticker Symbol")) {
                     TextField("AAPL", text: $tickerText)
                         .keyboardType(.default)
                         .autocapitalization(.allCharacters)

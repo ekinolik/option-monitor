@@ -211,12 +211,15 @@ class WebSocketService: ObservableObject {
         guard configService.notificationsEnabled else { return }
         
         // Call ratio takes precedence for notifications too
-        if summary.callPutRatio >= configService.callRatioThreshold {
+        // But only if total premium meets the ratio premium threshold
+        if summary.callPutRatio >= configService.callRatioThreshold &&
+           summary.totalPremium >= configService.totalPremiumThreshold {
             notificationService.sendThresholdNotification(for: summary, thresholdType: .callRatioExceeded)
             return // Don't check premium thresholds if ratio threshold is met
         }
         
-        if summary.callPutRatio <= configService.putRatioThreshold {
+        if summary.callPutRatio <= configService.putRatioThreshold &&
+           summary.totalPremium >= configService.totalPremiumThreshold {
             notificationService.sendThresholdNotification(for: summary, thresholdType: .putRatioBelow)
             return // Don't check premium thresholds if ratio threshold is met
         }

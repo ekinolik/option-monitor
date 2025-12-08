@@ -5,24 +5,32 @@ class ConfigService: ObservableObject {
     
     private let hostKey = "websocket_host"
     private let portKey = "websocket_port"
-    private let callRatioThresholdKey = "call_ratio_threshold"
-    private let putRatioThresholdKey = "put_ratio_threshold"
-    private let callPremiumThresholdKey = "call_premium_threshold"
-    private let putPremiumThresholdKey = "put_premium_threshold"
-    private let totalPremiumThresholdKey = "total_premium_threshold"
     private let notificationsEnabledKey = "notifications_enabled"
     private let selectedDateKey = "selected_date"
     private let tickerKey = "ticker"
+    private let thresholdsPrefix = "thresholds_"
     
     private let defaultHost = "localhost"
     private let defaultPort = "8080"
-    private let defaultCallRatioThreshold: Double = 1.5
-    private let defaultPutRatioThreshold: Double = 0.5
-    private let defaultCallPremiumThreshold: Double = 1000000.0
-    private let defaultPutPremiumThreshold: Double = 50000.0
-    private let defaultTotalPremiumThreshold: Double = 1000000.0
     private let defaultNotificationsEnabled: Bool = true
     private let defaultTicker = "AAPL"
+    
+    // Current ticker for threshold access
+    @Published var ticker: String {
+        didSet {
+            let uppercased = ticker.uppercased()
+            UserDefaults.standard.set(uppercased, forKey: tickerKey)
+            // Load thresholds for new ticker
+            loadThresholdsForCurrentTicker()
+        }
+    }
+    
+    // Computed properties that read from current ticker's thresholds
+    @Published private(set) var callRatioThreshold: Double = ThresholdConfig.defaults.callRatioThreshold
+    @Published private(set) var putRatioThreshold: Double = ThresholdConfig.defaults.putRatioThreshold
+    @Published private(set) var callPremiumThreshold: Double = ThresholdConfig.defaults.callPremiumThreshold
+    @Published private(set) var putPremiumThreshold: Double = ThresholdConfig.defaults.putPremiumThreshold
+    @Published private(set) var totalPremiumThreshold: Double = ThresholdConfig.defaults.totalPremiumThreshold
     
     @Published var host: String {
         didSet {
@@ -33,36 +41,6 @@ class ConfigService: ObservableObject {
     @Published var port: String {
         didSet {
             UserDefaults.standard.set(port, forKey: portKey)
-        }
-    }
-    
-    @Published var callRatioThreshold: Double {
-        didSet {
-            UserDefaults.standard.set(callRatioThreshold, forKey: callRatioThresholdKey)
-        }
-    }
-    
-    @Published var putRatioThreshold: Double {
-        didSet {
-            UserDefaults.standard.set(putRatioThreshold, forKey: putRatioThresholdKey)
-        }
-    }
-    
-    @Published var callPremiumThreshold: Double {
-        didSet {
-            UserDefaults.standard.set(callPremiumThreshold, forKey: callPremiumThresholdKey)
-        }
-    }
-    
-    @Published var putPremiumThreshold: Double {
-        didSet {
-            UserDefaults.standard.set(putPremiumThreshold, forKey: putPremiumThresholdKey)
-        }
-    }
-    
-    @Published var totalPremiumThreshold: Double {
-        didSet {
-            UserDefaults.standard.set(totalPremiumThreshold, forKey: totalPremiumThresholdKey)
         }
     }
     
@@ -78,47 +56,9 @@ class ConfigService: ObservableObject {
         }
     }
     
-    @Published var ticker: String {
-        didSet {
-            UserDefaults.standard.set(ticker.uppercased(), forKey: tickerKey)
-        }
-    }
-    
     private init() {
         self.host = UserDefaults.standard.string(forKey: hostKey) ?? defaultHost
         self.port = UserDefaults.standard.string(forKey: portKey) ?? defaultPort
-        
-        // Load thresholds, defaulting if not set or invalid
-        if UserDefaults.standard.object(forKey: callRatioThresholdKey) != nil {
-            self.callRatioThreshold = UserDefaults.standard.double(forKey: callRatioThresholdKey)
-        } else {
-            self.callRatioThreshold = defaultCallRatioThreshold
-        }
-        
-        if UserDefaults.standard.object(forKey: putRatioThresholdKey) != nil {
-            self.putRatioThreshold = UserDefaults.standard.double(forKey: putRatioThresholdKey)
-        } else {
-            self.putRatioThreshold = defaultPutRatioThreshold
-        }
-        
-        if UserDefaults.standard.object(forKey: callPremiumThresholdKey) != nil {
-            self.callPremiumThreshold = UserDefaults.standard.double(forKey: callPremiumThresholdKey)
-        } else {
-            self.callPremiumThreshold = defaultCallPremiumThreshold
-        }
-        
-        if UserDefaults.standard.object(forKey: putPremiumThresholdKey) != nil {
-            self.putPremiumThreshold = UserDefaults.standard.double(forKey: putPremiumThresholdKey)
-        } else {
-            self.putPremiumThreshold = defaultPutPremiumThreshold
-        }
-        
-        if UserDefaults.standard.object(forKey: totalPremiumThresholdKey) != nil {
-            self.totalPremiumThreshold = UserDefaults.standard.double(forKey: totalPremiumThresholdKey)
-        } else {
-            self.totalPremiumThreshold = defaultTotalPremiumThreshold
-        }
-        
         self.notificationsEnabled = UserDefaults.standard.object(forKey: notificationsEnabledKey) as? Bool ?? defaultNotificationsEnabled
         
         // Load selected date, defaulting to today if not set
@@ -133,6 +73,63 @@ class ConfigService: ObservableObject {
             self.ticker = savedTicker.uppercased()
         } else {
             self.ticker = defaultTicker
+        }
+        
+        // Load thresholds for current ticker
+        loadThresholdsForCurrentTicker()
+    }
+    
+    private func loadThresholdsForCurrentTicker() {
+        let config = getThresholds(for: ticker)
+        callRatioThreshold = config.callRatioThreshold
+        putRatioThreshold = config.putRatioThreshold
+        callPremiumThreshold = config.callPremiumThreshold
+        putPremiumThreshold = config.putPremiumThreshold
+        totalPremiumThreshold = config.totalPremiumThreshold
+    }
+    
+    func getThresholds(for ticker: String) -> ThresholdConfig {
+        let key = "\(thresholdsPrefix)\(ticker.uppercased())"
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let config = try? JSONDecoder().decode(ThresholdConfig.self, from: data) else {
+            return ThresholdConfig.defaults
+        }
+        return config
+    }
+    
+    func saveThresholds(for ticker: String, config: ThresholdConfig) {
+        let uppercasedTicker = ticker.uppercased()
+        let key = "\(thresholdsPrefix)\(uppercasedTicker)"
+        
+        // Only save if different from defaults
+        if config.isEqualToDefaults() {
+            // Remove saved thresholds if they match defaults
+            UserDefaults.standard.removeObject(forKey: key)
+        } else {
+            // Save custom thresholds
+            if let data = try? JSONEncoder().encode(config) {
+                UserDefaults.standard.set(data, forKey: key)
+            }
+        }
+        
+        // If this is the current ticker, update published properties
+        if uppercasedTicker == self.ticker {
+            loadThresholdsForCurrentTicker()
+        }
+    }
+    
+    func hasCustomThresholds(for ticker: String) -> Bool {
+        let key = "\(thresholdsPrefix)\(ticker.uppercased())"
+        return UserDefaults.standard.data(forKey: key) != nil
+    }
+    
+    func clearThresholds(for ticker: String) {
+        let key = "\(thresholdsPrefix)\(ticker.uppercased())"
+        UserDefaults.standard.removeObject(forKey: key)
+        
+        // If this is the current ticker, reload defaults
+        if ticker.uppercased() == self.ticker {
+            loadThresholdsForCurrentTicker()
         }
     }
     
@@ -171,12 +168,8 @@ class ConfigService: ObservableObject {
     func resetToDefaults() {
         host = defaultHost
         port = defaultPort
-        callRatioThreshold = defaultCallRatioThreshold
-        putRatioThreshold = defaultPutRatioThreshold
-        callPremiumThreshold = defaultCallPremiumThreshold
-        putPremiumThreshold = defaultPutPremiumThreshold
-        totalPremiumThreshold = defaultTotalPremiumThreshold
         ticker = defaultTicker
+        // Thresholds will be reloaded automatically via loadThresholdsForCurrentTicker()
     }
 }
 

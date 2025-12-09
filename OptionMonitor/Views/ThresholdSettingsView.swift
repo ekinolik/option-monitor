@@ -144,7 +144,14 @@ struct ThresholdSettingsView: View {
             totalPremiumThreshold: totalPremium
         )
         
+        // Save locally first
         configService.saveThresholds(for: currentTicker, config: config)
+        
+        // Save to server in background (errors handled silently)
+        Task {
+            await NotificationThresholdService.shared.saveThresholds(ticker: currentTicker, config: config)
+        }
+        
         dismiss()
     }
     

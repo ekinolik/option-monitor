@@ -114,6 +114,38 @@ class WebSocketService: ObservableObject {
         // Mark that we should clear summaries when we receive the first message
         shouldClearOnFirstMessage = true
         
+        // Load thresholds from server before connecting
+        Task {
+            await loadThresholdsFromServer()
+            
+            // Proceed with WebSocket connection after loading thresholds
+            await MainActor.run {
+                self.establishWebSocketConnection(url: url, sessionID: sessionID)
+            }
+        }
+    }
+    
+    private func loadThresholdsFromServer() async {
+        let currentTicker = configService.ticker
+        let thresholdService = NotificationThresholdService.shared
+        
+        do {
+            if let serverConfig = try await thresholdService.fetchThresholds(ticker: currentTicker) {
+                // Server returned thresholds - update ConfigService
+                await MainActor.run {
+                    configService.saveThresholds(for: currentTicker, config: serverConfig)
+                }
+            } else {
+                // Server returned empty or error - use local storage (existing behavior)
+                // Local storage is already loaded, so no action needed
+            }
+        } catch {
+            // Silently fall back to local storage
+            // Local storage is already loaded, so no action needed
+        }
+    }
+    
+    private func establishWebSocketConnection(url: URL, sessionID: String) {
         // Create URLRequest with authentication header
         var request = URLRequest(url: url)
         request.setValue("Bearer \(sessionID)", forHTTPHeaderField: "Authorization")

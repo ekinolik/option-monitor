@@ -205,6 +205,61 @@ class ConfigService: ObservableObject {
         return components.url
     }
     
+    func getNotificationsURL() -> URL? {
+        var components = URLComponents()
+        
+        // Determine scheme based on useHttp setting or localhost
+        if host.contains("localhost") || host.contains("127.0.0.1") {
+            components.scheme = "http"
+        } else if useHttp {
+            components.scheme = "http"
+        } else {
+            components.scheme = "https"
+        }
+        
+        components.host = host
+        // Only set port if it's not the default for the scheme
+        if let portInt = Int(port) {
+            let defaultPort = components.scheme == "https" ? 443 : 80
+            if portInt != defaultPort {
+                components.port = portInt
+            }
+        }
+        components.path = "/notifications"
+        
+        return components.url
+    }
+    
+    func getNotificationsURL(ticker: String) -> URL? {
+        var components = URLComponents()
+        
+        // Determine scheme based on useHttp setting or localhost
+        if host.contains("localhost") || host.contains("127.0.0.1") {
+            components.scheme = "http"
+        } else if useHttp {
+            components.scheme = "http"
+        } else {
+            components.scheme = "https"
+        }
+        
+        components.host = host
+        // Only set port if it's not the default for the scheme
+        if let portInt = Int(port) {
+            let defaultPort = components.scheme == "https" ? 443 : 80
+            if portInt != defaultPort {
+                components.port = portInt
+            }
+        }
+        components.path = "/notifications"
+        
+        // Add ticker query parameter for GET requests
+        components.queryItems = [
+            URLQueryItem(name: "ticker", value: ticker.uppercased())
+        ]
+        
+        return components.url
+    }
+    
     func resetToDefaults() {
         host = defaultHost
         port = defaultPort

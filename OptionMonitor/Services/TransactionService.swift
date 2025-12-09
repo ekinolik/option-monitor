@@ -3,6 +3,7 @@ import Foundation
 class TransactionService {
     static let shared = TransactionService()
     private let configService = ConfigService.shared
+    private let authService = AuthenticationService.shared
     
     private init() {}
     
@@ -11,10 +12,62 @@ class TransactionService {
             throw TransactionError.invalidURL
         }
         
-        let (data, response) = try await URLSession.shared.data(from: url)
+        // Check authentication
+        guard authService.isAuthenticated, let sessionID = authService.sessionID else {
+            throw TransactionError.authenticationRequired
+        }
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        // Create request with authentication header
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(sessionID)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw TransactionError.invalidResponse
+        }
+        
+        // Handle 401 - authentication required
+        if httpResponse.statusCode == 401 {
+            print("🔐 [Transaction] 401 error - clearing invalid session")
+            // Clear invalid session first
+            await MainActor.run {
+                authService.handleAuthenticationFailure()
+            }
+            
+            // Trigger re-authentication
+            await MainActor.run {
+                authService.signInWithApple()
+            }
+            
+            // Wait for authentication to complete (with timeout)
+            var retryCount = 0
+            while !authService.isAuthenticated && retryCount < 30 {
+                try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                retryCount += 1
+            }
+            
+            // If authenticated, retry the request
+            if authService.isAuthenticated, let newSessionID = authService.sessionID {
+                var retryRequest = URLRequest(url: url)
+                retryRequest.setValue("Bearer \(newSessionID)", forHTTPHeaderField: "Authorization")
+                
+                let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+                
+                guard let retryHttpResponse = retryResponse as? HTTPURLResponse,
+                      retryHttpResponse.statusCode == 200 else {
+                    throw TransactionError.invalidResponse
+                }
+                
+                let decoder = JSONDecoder()
+                let transactions = try decoder.decode([Transaction].self, from: retryData)
+                return transactions
+            } else {
+                throw TransactionError.authenticationRequired
+            }
+        }
+        
+        guard httpResponse.statusCode == 200 else {
             throw TransactionError.invalidResponse
         }
         
@@ -27,12 +80,13 @@ class TransactionService {
     private func buildTransactionsURL(date: Date, time: Date) -> URL? {
         var components = URLComponents()
         
-        // Determine scheme and host based on config
+        // Determine scheme based on useHttp setting or localhost
         let host = configService.host
         if host.contains("localhost") || host.contains("127.0.0.1") {
             components.scheme = "http"
+        } else if configService.useHttp {
+            components.scheme = "http"
         } else {
-            // Use https for remote hosts
             components.scheme = "https"
         }
         
@@ -74,5 +128,6 @@ enum TransactionError: Error {
     case invalidURL
     case invalidResponse
     case decodingError
+    case authenticationRequired
 }
 

@@ -7,6 +7,9 @@ struct OptionMonitorApp: App {
     init() {
         // Request notification permissions on app launch
         NotificationService.shared.requestAuthorization()
+        
+        // Initialize and check authentication status
+        _ = AuthenticationService.shared
     }
     
     var body: some Scene {

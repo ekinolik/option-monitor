@@ -11,6 +11,7 @@ enum SortOption: String, CaseIterable {
 struct SummaryListView: View {
     @StateObject private var webSocketService = WebSocketService()
     @ObservedObject private var configService = ConfigService.shared
+    @ObservedObject private var authService = AuthenticationService.shared
     @Environment(\.scenePhase) var scenePhase
     @State private var selectedSummary: OptionSummary?
     @State private var sortOption: SortOption = .time
@@ -20,7 +21,9 @@ struct SummaryListView: View {
     @State private var filterByThreshold = false
     
     var body: some View {
-        NavigationView {
+        Group {
+            if authService.isAuthenticated {
+                NavigationView {
             VStack(spacing: 0) {
                 // Header row 2: Ticker and date
                 tickerAndDateHeader
@@ -116,6 +119,18 @@ struct SummaryListView: View {
             .onChange(of: scenePhase) { newPhase in
                 handleScenePhaseChange(newPhase)
             }
+            .onChange(of: authService.isAuthenticated) { isAuthenticated in
+                if isAuthenticated {
+                    webSocketService.connect()
+                }
+            }
+                }
+            } else {
+                SignInView()
+            }
+        }
+        .onAppear {
+            authService.checkAuthenticationStatus()
         }
     }
     

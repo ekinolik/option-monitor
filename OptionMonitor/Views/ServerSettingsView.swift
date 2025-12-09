@@ -22,6 +22,10 @@ struct ServerSettingsView: View {
                     TextField("8080", text: $portText)
                         .keyboardType(.numberPad)
                 }
+                
+                if configService.isDevBundle {
+                    Toggle("Use HTTP (disable HTTPS)", isOn: $configService.useHttp)
+                }
             }
             
             Section(header: Text("Notifications")) {

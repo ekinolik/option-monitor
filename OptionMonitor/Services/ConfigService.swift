@@ -8,12 +8,14 @@ class ConfigService: ObservableObject {
     private let notificationsEnabledKey = "notifications_enabled"
     private let selectedDateKey = "selected_date"
     private let tickerKey = "ticker"
+    private let useHttpKey = "use_http"
     private let thresholdsPrefix = "thresholds_"
     
     private let defaultHost = "localhost"
     private let defaultPort = "8080"
     private let defaultNotificationsEnabled: Bool = true
     private let defaultTicker = "AAPL"
+    private let defaultUseHttp: Bool = false
     
     // Current ticker for threshold access
     @Published var ticker: String {
@@ -56,10 +58,21 @@ class ConfigService: ObservableObject {
         }
     }
     
+    @Published var useHttp: Bool {
+        didSet {
+            UserDefaults.standard.set(useHttp, forKey: useHttpKey)
+        }
+    }
+    
+    var isDevBundle: Bool {
+        Bundle.main.bundleIdentifier == "io.chaossignal.optionmonitor.dev"
+    }
+    
     private init() {
         self.host = UserDefaults.standard.string(forKey: hostKey) ?? defaultHost
         self.port = UserDefaults.standard.string(forKey: portKey) ?? defaultPort
         self.notificationsEnabled = UserDefaults.standard.object(forKey: notificationsEnabledKey) as? Bool ?? defaultNotificationsEnabled
+        self.useHttp = UserDefaults.standard.object(forKey: useHttpKey) as? Bool ?? defaultUseHttp
         
         // Load selected date, defaulting to today if not set
         if let savedDate = UserDefaults.standard.object(forKey: selectedDateKey) as? Date {
@@ -136,8 +149,10 @@ class ConfigService: ObservableObject {
     func getWebSocketURL() -> URL? {
         var components = URLComponents()
         
-        // Use wss (WebSocket Secure) for HTTPS, ws for localhost
+        // Determine scheme based on useHttp setting or localhost
         if host.contains("localhost") || host.contains("127.0.0.1") {
+            components.scheme = "ws"
+        } else if useHttp {
             components.scheme = "ws"
         } else {
             components.scheme = "wss"
@@ -165,10 +180,36 @@ class ConfigService: ObservableObject {
         return components.url
     }
     
+    func getAuthURL() -> URL? {
+        var components = URLComponents()
+        
+        // Determine scheme based on useHttp setting or localhost
+        if host.contains("localhost") || host.contains("127.0.0.1") {
+            components.scheme = "http"
+        } else if useHttp {
+            components.scheme = "http"
+        } else {
+            components.scheme = "https"
+        }
+        
+        components.host = host
+        // Only set port if it's not the default for the scheme
+        if let portInt = Int(port) {
+            let defaultPort = components.scheme == "https" ? 443 : 80
+            if portInt != defaultPort {
+                components.port = portInt
+            }
+        }
+        components.path = "/auth/login"
+        
+        return components.url
+    }
+    
     func resetToDefaults() {
         host = defaultHost
         port = defaultPort
         ticker = defaultTicker
+        useHttp = defaultUseHttp
         // Thresholds will be reloaded automatically via loadThresholdsForCurrentTicker()
     }
 }

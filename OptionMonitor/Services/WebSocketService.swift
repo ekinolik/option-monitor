@@ -214,11 +214,19 @@ class WebSocketService: ObservableObject {
                     self.shouldClearOnFirstMessage = false
                 }
                 
+                // Check if a summary for this time period already exists
+                if let existingIndex = self.summaries.firstIndex(where: { 
+                    Calendar.current.isDate($0.periodStart, equalTo: summary.periodStart, toGranularity: .minute)
+                }) {
+                    // Update existing summary with new data
+                    self.summaries[existingIndex] = summary
+                } else {
+                    // Insert new summary at the beginning to show newest first
+                    self.summaries.insert(summary, at: 0)
+                }
+                
                 // Check thresholds and send notifications if needed
                 self.checkThresholdsAndNotify(for: summary)
-                
-                // Insert at the beginning to show newest first
-                self.summaries.insert(summary, at: 0)
             }
         } catch {
             // If decoding fails, check if it might be an error message

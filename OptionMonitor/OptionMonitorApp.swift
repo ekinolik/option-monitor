@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct OptionMonitorApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Environment(\.scenePhase) var scenePhase
     
     init() {

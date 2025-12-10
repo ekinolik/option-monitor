@@ -128,6 +128,12 @@ class AuthenticationService: NSObject, ObservableObject {
                                 self.isAuthenticated = true
                                 self.isSigningIn = false
                                 self.authError = nil
+                                
+                                // Register device for push notifications if token is available
+                                let notificationService = NotificationService.shared
+                                if let deviceToken = notificationService.deviceToken {
+                                    DeviceRegistrationService.shared.registerDeviceWithRetry(deviceToken: deviceToken)
+                                }
                             }
                         } else {
                             print("🔐 [Auth] ❌ Failed to save session ID to Keychain")

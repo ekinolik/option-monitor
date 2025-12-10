@@ -12,6 +12,7 @@ struct SummaryListView: View {
     @StateObject private var webSocketService = WebSocketService()
     @ObservedObject private var configService = ConfigService.shared
     @ObservedObject private var authService = AuthenticationService.shared
+    @ObservedObject private var deviceRegistrationService = DeviceRegistrationService.shared
     @Environment(\.scenePhase) var scenePhase
     @State private var selectedSummary: OptionSummary?
     @State private var sortOption: SortOption = .time
@@ -19,6 +20,7 @@ struct SummaryListView: View {
     @State private var showTickerPicker = false
     @State private var showThresholdSettings = false
     @State private var filterByThreshold = false
+    @State private var showRegistrationError = false
     
     var body: some View {
         Group {
@@ -109,6 +111,18 @@ struct SummaryListView: View {
                 NavigationView {
                     ThresholdSettingsView()
                 }
+            }
+            .alert("Device Registration Error", isPresented: $showRegistrationError) {
+                Button("OK") {
+                    deviceRegistrationService.registrationError = nil
+                }
+            } message: {
+                if let error = deviceRegistrationService.registrationError {
+                    Text(error)
+                }
+            }
+            .onChange(of: deviceRegistrationService.registrationError) { error in
+                showRegistrationError = error != nil
             }
             .onAppear {
                 webSocketService.connect()

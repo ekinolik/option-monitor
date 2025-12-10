@@ -256,9 +256,6 @@ class WebSocketService: ObservableObject {
                     // Insert new summary at the beginning to show newest first
                     self.summaries.insert(summary, at: 0)
                 }
-                
-                // Check thresholds and send notifications if needed
-                self.checkThresholdsAndNotify(for: summary)
             }
         } catch {
             // If decoding fails, check if it might be an error message
@@ -344,35 +341,5 @@ class WebSocketService: ObservableObject {
         }
     }
     
-    private func checkThresholdsAndNotify(for summary: OptionSummary) {
-        // Only send notifications if enabled
-        guard configService.notificationsEnabled else { return }
-        
-        // Call ratio takes precedence for notifications too
-        // But only if total premium meets the ratio premium threshold
-        if summary.callPutRatio >= configService.callRatioThreshold &&
-           summary.totalPremium >= configService.totalPremiumThreshold {
-            notificationService.sendThresholdNotification(for: summary, thresholdType: .callRatioExceeded)
-            return // Don't check premium thresholds if ratio threshold is met
-        }
-        
-        if summary.callPutRatio <= configService.putRatioThreshold &&
-           summary.totalPremium >= configService.totalPremiumThreshold {
-            notificationService.sendThresholdNotification(for: summary, thresholdType: .putRatioBelow)
-            return // Don't check premium thresholds if ratio threshold is met
-        }
-        
-        // If call ratio thresholds not met, check premium thresholds
-        let callPremiumExceeded = summary.callPremium >= configService.callPremiumThreshold
-        let putPremiumExceeded = summary.putPremium >= configService.putPremiumThreshold
-        
-        if callPremiumExceeded && putPremiumExceeded {
-            notificationService.sendThresholdNotification(for: summary, thresholdType: .bothPremiumsExceeded)
-        } else if callPremiumExceeded {
-            notificationService.sendThresholdNotification(for: summary, thresholdType: .callPremiumExceeded)
-        } else if putPremiumExceeded {
-            notificationService.sendThresholdNotification(for: summary, thresholdType: .putPremiumExceeded)
-        }
-    }
 }
 

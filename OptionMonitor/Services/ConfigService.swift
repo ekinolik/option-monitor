@@ -205,6 +205,31 @@ class ConfigService: ObservableObject {
         return components.url
     }
     
+    func getRegisterDeviceURL() -> URL? {
+        var components = URLComponents()
+        
+        // Determine scheme based on useHttp setting or localhost
+        if host.contains("localhost") || host.contains("127.0.0.1") {
+            components.scheme = "http"
+        } else if useHttp {
+            components.scheme = "http"
+        } else {
+            components.scheme = "https"
+        }
+        
+        components.host = host
+        // Only set port if it's not the default for the scheme
+        if let portInt = Int(port) {
+            let defaultPort = components.scheme == "https" ? 443 : 80
+            if portInt != defaultPort {
+                components.port = portInt
+            }
+        }
+        components.path = "/auth/register"
+        
+        return components.url
+    }
+    
     func getNotificationsURL() -> URL? {
         var components = URLComponents()
         

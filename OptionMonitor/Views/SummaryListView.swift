@@ -345,16 +345,16 @@ struct SummaryListView: View {
     }
     
     private func meetsThreshold(_ summary: OptionSummary) -> Bool {
-        // Check if summary meets any threshold (same logic as backgroundColor)
-        if summary.callPremium >= configService.callPremiumThreshold {
+        // Check if summary meets any highlight threshold (same logic as backgroundColor)
+        if summary.callPremium >= configService.highlightCallPremiumThreshold {
             return true
-        } else if summary.callPutRatio >= configService.callRatioThreshold &&
-                  summary.totalPremium >= configService.totalPremiumThreshold {
+        } else if summary.callPutRatio >= configService.highlightCallRatioThreshold &&
+                  summary.totalPremium >= configService.highlightTotalPremiumThreshold {
             return true
-        } else if summary.putPremium >= configService.putPremiumThreshold {
+        } else if summary.putPremium >= configService.highlightPutPremiumThreshold {
             return true
-        } else if summary.callPutRatio <= configService.putRatioThreshold &&
-                  summary.totalPremium >= configService.totalPremiumThreshold {
+        } else if summary.callPutRatio <= configService.highlightPutRatioThreshold &&
+                  summary.totalPremium >= configService.highlightTotalPremiumThreshold {
             return true
         }
         
@@ -399,16 +399,16 @@ struct SummaryRowView: View {
     @ObservedObject private var configService = ConfigService.shared
     
     private var backgroundColor: Color {
-        // Check thresholds in priority order
-        if summary.callPremium >= configService.callPremiumThreshold {
+        // Check highlight thresholds in priority order
+        if summary.callPremium >= configService.highlightCallPremiumThreshold {
             return Color.green.opacity(0.15)
-        } else if summary.callPutRatio >= configService.callRatioThreshold &&
-                  summary.totalPremium >= configService.totalPremiumThreshold {
+        } else if summary.callPutRatio >= configService.highlightCallRatioThreshold &&
+                  summary.totalPremium >= configService.highlightTotalPremiumThreshold {
             return Color.green.opacity(0.15)
-        } else if summary.putPremium >= configService.putPremiumThreshold {
+        } else if summary.putPremium >= configService.highlightPutPremiumThreshold {
             return Color.red.opacity(0.15)
-        } else if summary.callPutRatio <= configService.putRatioThreshold &&
-                  summary.totalPremium >= configService.totalPremiumThreshold {
+        } else if summary.callPutRatio <= configService.highlightPutRatioThreshold &&
+                  summary.totalPremium >= configService.highlightTotalPremiumThreshold {
             return Color.red.opacity(0.15)
         }
         

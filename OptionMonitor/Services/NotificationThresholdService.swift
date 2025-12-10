@@ -36,20 +36,46 @@ class NotificationThresholdService {
                 // Check if response is empty JSON
                 if let jsonString = String(data: data, encoding: .utf8),
                    jsonString.trimmingCharacters(in: .whitespacesAndNewlines) == "{}" {
-                    print("🔔 [Thresholds] Server returned empty JSON, using local storage")
                     return nil
                 }
                 
                 // Parse JSON response
                 if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    // Map snake_case server fields to ThresholdConfig
-                    guard let ratioPremiumThreshold = json["ratio_premium_threshold"] as? Double,
-                          let callRatioThreshold = json["call_ratio_threshold"] as? Double,
-                          let putRatioThreshold = json["put_ratio_threshold"] as? Double,
-                          let callPremiumThreshold = json["call_premium_threshold"] as? Double,
-                          let putPremiumThreshold = json["put_premium_threshold"] as? Double else {
-                        print("🔔 [Thresholds] Missing required fields in server response")
+                    // Navigate nested structure: notifications -> ticker -> thresholds
+                    guard let notifications = json["notifications"] as? [String: Any],
+                          let tickerData = notifications[ticker.uppercased()] as? [String: Any] else {
                         return nil
+                    }
+                    
+                    // Helper function to extract Double from various types
+                    func extractDouble(from value: Any?) -> Double? {
+                        if let doubleValue = value as? Double {
+                            return doubleValue
+                        } else if let intValue = value as? Int {
+                            return Double(intValue)
+                        } else if let stringValue = value as? String, let doubleValue = Double(stringValue) {
+                            return doubleValue
+                        }
+                        return nil
+                    }
+                    
+                    // Map snake_case server fields to ThresholdConfig
+                    guard let ratioPremiumThreshold = extractDouble(from: tickerData["ratio_premium_threshold"]),
+                          let callRatioThreshold = extractDouble(from: tickerData["call_ratio_threshold"]),
+                          let putRatioThreshold = extractDouble(from: tickerData["put_ratio_threshold"]),
+                          let callPremiumThreshold = extractDouble(from: tickerData["call_premium_threshold"]),
+                          let putPremiumThreshold = extractDouble(from: tickerData["put_premium_threshold"]) else {
+                        return nil
+                    }
+                    
+                    // Extract disabled field (defaults to false if not present)
+                    let disabled: Bool
+                    if let disabledValue = tickerData["disabled"] as? Bool {
+                        disabled = disabledValue
+                    } else if let disabledValue = tickerData["disabled"] as? Int {
+                        disabled = disabledValue != 0
+                    } else {
+                        disabled = false // Default to enabled
                     }
                     
                     let config = ThresholdConfig(
@@ -57,13 +83,12 @@ class NotificationThresholdService {
                         putRatioThreshold: putRatioThreshold,
                         callPremiumThreshold: callPremiumThreshold,
                         putPremiumThreshold: putPremiumThreshold,
-                        totalPremiumThreshold: ratioPremiumThreshold
+                        totalPremiumThreshold: ratioPremiumThreshold,
+                        disabled: disabled
                     )
                     
-                    print("🔔 [Thresholds] Successfully loaded thresholds from server for \(ticker)")
                     return config
                 } else {
-                    print("🔔 [Thresholds] Failed to parse JSON response")
                     return nil
                 }
             } else if httpResponse.statusCode == 401 {
@@ -83,7 +108,7 @@ class NotificationThresholdService {
         }
     }
     
-    func saveThresholds(ticker: String, config: ThresholdConfig) async {
+    func saveThresholds(ticker: String, config: ThresholdConfig, disabled: Bool? = nil) async {
         guard let url = configService.getNotificationsURL() else {
             print("🔔 [Thresholds] Invalid notifications URL for save")
             return
@@ -101,13 +126,17 @@ class NotificationThresholdService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         // Build request body with snake_case field names
-        let requestBody: [String: Any] = [
+        // Use disabled parameter if provided, otherwise use config.disabled, default to false
+        let disabledValue = disabled ?? config.disabled ?? false
+        
+        var requestBody: [String: Any] = [
             "ticker": ticker.uppercased(),
             "ratio_premium_threshold": config.totalPremiumThreshold,
             "call_ratio_threshold": config.callRatioThreshold,
             "put_ratio_threshold": config.putRatioThreshold,
             "call_premium_threshold": config.callPremiumThreshold,
-            "put_premium_threshold": config.putPremiumThreshold
+            "put_premium_threshold": config.putPremiumThreshold,
+            "disabled": disabledValue
         ]
         
         do {

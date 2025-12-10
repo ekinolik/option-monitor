@@ -131,9 +131,9 @@ class WebSocketService: ObservableObject {
         
         do {
             if let serverConfig = try await thresholdService.fetchThresholds(ticker: currentTicker) {
-                // Server returned thresholds - update ConfigService
+                // Server returned notification thresholds - update ConfigService
                 await MainActor.run {
-                    configService.saveThresholds(for: currentTicker, config: serverConfig)
+                    configService.saveNotificationThresholds(for: currentTicker, config: serverConfig)
                 }
             } else {
                 // Server returned empty or error - use local storage (existing behavior)

@@ -9,7 +9,8 @@ class ConfigService: ObservableObject {
     private let selectedDateKey = "selected_date"
     private let tickerKey = "ticker"
     private let useHttpKey = "use_http"
-    private let thresholdsPrefix = "thresholds_"
+    private let notificationThresholdsPrefix = "notification_thresholds_"
+    private let highlightThresholdsPrefix = "highlight_thresholds_"
     
     private let defaultHost = "localhost"
     private let defaultPort = "8080"
@@ -27,12 +28,26 @@ class ConfigService: ObservableObject {
         }
     }
     
-    // Computed properties that read from current ticker's thresholds
-    @Published private(set) var callRatioThreshold: Double = ThresholdConfig.defaults.callRatioThreshold
-    @Published private(set) var putRatioThreshold: Double = ThresholdConfig.defaults.putRatioThreshold
-    @Published private(set) var callPremiumThreshold: Double = ThresholdConfig.defaults.callPremiumThreshold
-    @Published private(set) var putPremiumThreshold: Double = ThresholdConfig.defaults.putPremiumThreshold
-    @Published private(set) var totalPremiumThreshold: Double = ThresholdConfig.defaults.totalPremiumThreshold
+    // Notification thresholds (for push notifications) - stored on server and locally
+    @Published private(set) var notificationCallRatioThreshold: Double = ThresholdConfig.defaults.callRatioThreshold
+    @Published private(set) var notificationPutRatioThreshold: Double = ThresholdConfig.defaults.putRatioThreshold
+    @Published private(set) var notificationCallPremiumThreshold: Double = ThresholdConfig.defaults.callPremiumThreshold
+    @Published private(set) var notificationPutPremiumThreshold: Double = ThresholdConfig.defaults.putPremiumThreshold
+    @Published private(set) var notificationTotalPremiumThreshold: Double = ThresholdConfig.defaults.totalPremiumThreshold
+    
+    // Highlight thresholds (for row colors) - stored locally only
+    @Published private(set) var highlightCallRatioThreshold: Double = ThresholdConfig.defaults.callRatioThreshold
+    @Published private(set) var highlightPutRatioThreshold: Double = ThresholdConfig.defaults.putRatioThreshold
+    @Published private(set) var highlightCallPremiumThreshold: Double = ThresholdConfig.defaults.callPremiumThreshold
+    @Published private(set) var highlightPutPremiumThreshold: Double = ThresholdConfig.defaults.putPremiumThreshold
+    @Published private(set) var highlightTotalPremiumThreshold: Double = ThresholdConfig.defaults.totalPremiumThreshold
+    
+    // Legacy properties for backward compatibility (now map to highlight thresholds)
+    var callRatioThreshold: Double { highlightCallRatioThreshold }
+    var putRatioThreshold: Double { highlightPutRatioThreshold }
+    var callPremiumThreshold: Double { highlightCallPremiumThreshold }
+    var putPremiumThreshold: Double { highlightPutPremiumThreshold }
+    var totalPremiumThreshold: Double { highlightTotalPremiumThreshold }
     
     @Published var host: String {
         didSet {
@@ -93,16 +108,27 @@ class ConfigService: ObservableObject {
     }
     
     private func loadThresholdsForCurrentTicker() {
-        let config = getThresholds(for: ticker)
-        callRatioThreshold = config.callRatioThreshold
-        putRatioThreshold = config.putRatioThreshold
-        callPremiumThreshold = config.callPremiumThreshold
-        putPremiumThreshold = config.putPremiumThreshold
-        totalPremiumThreshold = config.totalPremiumThreshold
+        // Load notification thresholds
+        let notificationConfig = getNotificationThresholds(for: ticker)
+        notificationCallRatioThreshold = notificationConfig.callRatioThreshold
+        notificationPutRatioThreshold = notificationConfig.putRatioThreshold
+        notificationCallPremiumThreshold = notificationConfig.callPremiumThreshold
+        notificationPutPremiumThreshold = notificationConfig.putPremiumThreshold
+        notificationTotalPremiumThreshold = notificationConfig.totalPremiumThreshold
+        
+        // Load highlight thresholds (always has defaults)
+        let highlightConfig = getHighlightThresholds(for: ticker)
+        highlightCallRatioThreshold = highlightConfig.callRatioThreshold
+        highlightPutRatioThreshold = highlightConfig.putRatioThreshold
+        highlightCallPremiumThreshold = highlightConfig.callPremiumThreshold
+        highlightPutPremiumThreshold = highlightConfig.putPremiumThreshold
+        highlightTotalPremiumThreshold = highlightConfig.totalPremiumThreshold
     }
     
-    func getThresholds(for ticker: String) -> ThresholdConfig {
-        let key = "\(thresholdsPrefix)\(ticker.uppercased())"
+    // MARK: - Notification Thresholds (Server + Local)
+    
+    func getNotificationThresholds(for ticker: String) -> ThresholdConfig {
+        let key = "\(notificationThresholdsPrefix)\(ticker.uppercased())"
         guard let data = UserDefaults.standard.data(forKey: key),
               let config = try? JSONDecoder().decode(ThresholdConfig.self, from: data) else {
             return ThresholdConfig.defaults
@@ -110,19 +136,13 @@ class ConfigService: ObservableObject {
         return config
     }
     
-    func saveThresholds(for ticker: String, config: ThresholdConfig) {
+    func saveNotificationThresholds(for ticker: String, config: ThresholdConfig) {
         let uppercasedTicker = ticker.uppercased()
-        let key = "\(thresholdsPrefix)\(uppercasedTicker)"
+        let key = "\(notificationThresholdsPrefix)\(uppercasedTicker)"
         
-        // Only save if different from defaults
-        if config.isEqualToDefaults() {
-            // Remove saved thresholds if they match defaults
-            UserDefaults.standard.removeObject(forKey: key)
-        } else {
-            // Save custom thresholds
-            if let data = try? JSONEncoder().encode(config) {
-                UserDefaults.standard.set(data, forKey: key)
-            }
+        // Save to local storage
+        if let data = try? JSONEncoder().encode(config) {
+            UserDefaults.standard.set(data, forKey: key)
         }
         
         // If this is the current ticker, update published properties
@@ -131,19 +151,79 @@ class ConfigService: ObservableObject {
         }
     }
     
-    func hasCustomThresholds(for ticker: String) -> Bool {
-        let key = "\(thresholdsPrefix)\(ticker.uppercased())"
+    func hasNotificationThresholds(for ticker: String) -> Bool {
+        let key = "\(notificationThresholdsPrefix)\(ticker.uppercased())"
         return UserDefaults.standard.data(forKey: key) != nil
     }
     
-    func clearThresholds(for ticker: String) {
-        let key = "\(thresholdsPrefix)\(ticker.uppercased())"
+    func clearNotificationThresholds(for ticker: String) {
+        let key = "\(notificationThresholdsPrefix)\(ticker.uppercased())"
         UserDefaults.standard.removeObject(forKey: key)
         
         // If this is the current ticker, reload defaults
         if ticker.uppercased() == self.ticker {
             loadThresholdsForCurrentTicker()
         }
+    }
+    
+    // MARK: - Highlight Thresholds (Local Only)
+    
+    func getHighlightThresholds(for ticker: String) -> ThresholdConfig {
+        let key = "\(highlightThresholdsPrefix)\(ticker.uppercased())"
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let config = try? JSONDecoder().decode(ThresholdConfig.self, from: data) else {
+            // Always return defaults if not set
+            return ThresholdConfig.defaults
+        }
+        return config
+    }
+    
+    func saveHighlightThresholds(for ticker: String, config: ThresholdConfig) {
+        let uppercasedTicker = ticker.uppercased()
+        let key = "\(highlightThresholdsPrefix)\(uppercasedTicker)"
+        
+        // Save to local storage
+        if let data = try? JSONEncoder().encode(config) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+        
+        // If this is the current ticker, update published properties
+        if uppercasedTicker == self.ticker {
+            loadThresholdsForCurrentTicker()
+        }
+    }
+    
+    func hasHighlightThresholds(for ticker: String) -> Bool {
+        let key = "\(highlightThresholdsPrefix)\(ticker.uppercased())"
+        return UserDefaults.standard.data(forKey: key) != nil
+    }
+    
+    func clearHighlightThresholds(for ticker: String) {
+        let key = "\(highlightThresholdsPrefix)\(ticker.uppercased())"
+        UserDefaults.standard.removeObject(forKey: key)
+        
+        // If this is the current ticker, reload defaults
+        if ticker.uppercased() == self.ticker {
+            loadThresholdsForCurrentTicker()
+        }
+    }
+    
+    // MARK: - Legacy Methods (for backward compatibility)
+    
+    func getThresholds(for ticker: String) -> ThresholdConfig {
+        return getHighlightThresholds(for: ticker)
+    }
+    
+    func saveThresholds(for ticker: String, config: ThresholdConfig) {
+        saveHighlightThresholds(for: ticker, config: config)
+    }
+    
+    func hasCustomThresholds(for ticker: String) -> Bool {
+        return hasHighlightThresholds(for: ticker)
+    }
+    
+    func clearThresholds(for ticker: String) {
+        clearHighlightThresholds(for: ticker)
     }
     
     func getWebSocketURL() -> URL? {

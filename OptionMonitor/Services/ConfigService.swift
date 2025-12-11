@@ -9,6 +9,7 @@ class ConfigService: ObservableObject {
     private let selectedDateKey = "selected_date"
     private let tickerKey = "ticker"
     private let useHttpKey = "use_http"
+    private let recentTickersKey = "recent_tickers"
     private let notificationThresholdsPrefix = "notification_thresholds_"
     private let highlightThresholdsPrefix = "highlight_thresholds_"
     
@@ -23,6 +24,8 @@ class ConfigService: ObservableObject {
         didSet {
             let uppercased = ticker.uppercased()
             UserDefaults.standard.set(uppercased, forKey: tickerKey)
+            // Add to recent tickers
+            addToRecentTickers(uppercased)
             // Load thresholds for new ticker
             loadThresholdsForCurrentTicker()
         }
@@ -371,6 +374,36 @@ class ConfigService: ObservableObject {
         ticker = defaultTicker
         useHttp = defaultUseHttp
         // Thresholds will be reloaded automatically via loadThresholdsForCurrentTicker()
+    }
+    
+    // MARK: - Recent Tickers
+    
+    func getRecentTickers() -> [String] {
+        guard let data = UserDefaults.standard.data(forKey: recentTickersKey),
+              let tickers = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return tickers
+    }
+    
+    private func addToRecentTickers(_ ticker: String) {
+        var recentTickers = getRecentTickers()
+        
+        // Remove if already exists (to avoid duplicates)
+        recentTickers.removeAll { $0.uppercased() == ticker.uppercased() }
+        
+        // Add to front (most recent first)
+        recentTickers.insert(ticker.uppercased(), at: 0)
+        
+        // Keep only last 5
+        if recentTickers.count > 5 {
+            recentTickers = Array(recentTickers.prefix(5))
+        }
+        
+        // Save back to UserDefaults
+        if let data = try? JSONEncoder().encode(recentTickers) {
+            UserDefaults.standard.set(data, forKey: recentTickersKey)
+        }
     }
 }
 

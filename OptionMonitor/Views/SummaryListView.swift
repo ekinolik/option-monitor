@@ -508,17 +508,49 @@ struct DatePickerSheet: View {
 struct TickerPickerSheet: View {
     @Binding var ticker: String
     @Binding var isPresented: Bool
+    @ObservedObject private var configService = ConfigService.shared
     @State private var tickerText: String = ""
+    
+    private var recentTickers: [String] {
+        // Filter out current ticker and return recent tickers
+        configService.getRecentTickers().filter { $0.uppercased() != ticker.uppercased() }
+    }
     
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Ticker Symbol")) {
-                    TextField("AAPL", text: $tickerText)
+                Section(header: Text("Enter Ticker Symbol")) {
+                    TextField("Enter ticker", text: $tickerText)
                         .keyboardType(.default)
                         .autocapitalization(.allCharacters)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.characters)
+                        .listRowBackground(Color(.systemBackground))
+                }
+                
+                if !recentTickers.isEmpty {
+                    Section(header: Text("Recent Tickers")) {
+                        ForEach(recentTickers, id: \.self) { recentTicker in
+                            Button(action: {
+                                selectTicker(recentTicker)
+                            }) {
+                                HStack {
+                                    Text(recentTicker)
+                                        .font(.body)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.primary)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 4)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .listRowBackground(Color(.systemBackground))
+                        }
+                    }
                 }
             }
             .navigationTitle("Change Ticker")
@@ -534,9 +566,8 @@ struct TickerPickerSheet: View {
                     Button("Save") {
                         let trimmed = tickerText.trimmingCharacters(in: .whitespaces).uppercased()
                         if !trimmed.isEmpty {
-                            ticker = trimmed
+                            selectTicker(trimmed)
                         }
-                        isPresented = false
                     }
                     .disabled(tickerText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
@@ -545,6 +576,14 @@ struct TickerPickerSheet: View {
                 tickerText = ticker
             }
         }
+    }
+    
+    private func selectTicker(_ selectedTicker: String) {
+        let trimmed = selectedTicker.trimmingCharacters(in: .whitespaces).uppercased()
+        if !trimmed.isEmpty {
+            ticker = trimmed
+        }
+        isPresented = false
     }
 }
 

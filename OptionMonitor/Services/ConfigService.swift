@@ -12,6 +12,10 @@ class ConfigService: ObservableObject {
     private let recentTickersKey = "recent_tickers"
     private let notificationThresholdsPrefix = "notification_thresholds_"
     private let highlightThresholdsPrefix = "highlight_thresholds_"
+    private let strikeCountFilterKey = "strike_count_filter"
+    private let strikeSortOptionKey = "strike_sort_option"
+    private let strikeExpirationFilterKey = "strike_expiration_filter"
+    private let strikeAggregateByStrikeKey = "strike_aggregate_by_strike"
     
     private let defaultHost = "localhost"
     private let defaultPort = "8080"
@@ -81,6 +85,30 @@ class ConfigService: ObservableObject {
             UserDefaults.standard.set(useHttp, forKey: useHttpKey)
         }
     }
+
+    @Published var strikeCountFilter: StrikeCountFilter {
+        didSet {
+            UserDefaults.standard.set(strikeCountFilter.rawValue, forKey: strikeCountFilterKey)
+        }
+    }
+
+    @Published var strikeSortOption: StrikeSortOption {
+        didSet {
+            UserDefaults.standard.set(strikeSortOption.rawValue, forKey: strikeSortOptionKey)
+        }
+    }
+
+    @Published var strikeExpirationFilter: StrikeExpirationFilter {
+        didSet {
+            UserDefaults.standard.set(strikeExpirationFilter.rawValue, forKey: strikeExpirationFilterKey)
+        }
+    }
+
+    @Published var strikeAggregateByStrike: Bool {
+        didSet {
+            UserDefaults.standard.set(strikeAggregateByStrike, forKey: strikeAggregateByStrikeKey)
+        }
+    }
     
     var isDevBundle: Bool {
         Bundle.main.bundleIdentifier == "io.chaossignal.optionmonitor.dev"
@@ -104,6 +132,33 @@ class ConfigService: ObservableObject {
             self.ticker = savedTicker.uppercased()
         } else {
             self.ticker = defaultTicker
+        }
+
+        if let rawCountFilter = UserDefaults.standard.string(forKey: strikeCountFilterKey),
+           let countFilter = StrikeCountFilter(rawValue: rawCountFilter) {
+            self.strikeCountFilter = countFilter
+        } else {
+            self.strikeCountFilter = .all
+        }
+
+        if let rawSortOption = UserDefaults.standard.string(forKey: strikeSortOptionKey),
+           let sortOption = StrikeSortOption(rawValue: rawSortOption) {
+            self.strikeSortOption = sortOption
+        } else {
+            self.strikeSortOption = .expiration
+        }
+
+        if let rawExpirationFilter = UserDefaults.standard.string(forKey: strikeExpirationFilterKey),
+           let expirationFilter = StrikeExpirationFilter(rawValue: rawExpirationFilter) {
+            self.strikeExpirationFilter = expirationFilter
+        } else {
+            self.strikeExpirationFilter = .all
+        }
+
+        self.strikeAggregateByStrike = UserDefaults.standard.object(forKey: strikeAggregateByStrikeKey) as? Bool ?? false
+
+        if strikeAggregateByStrike && strikeSortOption == .expiration {
+            self.strikeSortOption = .totalPremium
         }
         
         // Load thresholds for current ticker

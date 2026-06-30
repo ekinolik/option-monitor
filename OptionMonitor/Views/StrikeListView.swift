@@ -333,6 +333,11 @@ struct StrikeRowView: View {
     let maxTotalPremium: Double
     let expirationText: String?
 
+    private let callPremiumColor = Color(red: 0.0, green: 0.48, blue: 0.14)
+    private let putPremiumColor = Color(red: 0.78, green: 0.12, blue: 0.12)
+    private let callBarColor = Color.green.opacity(0.095)
+    private let putBarColor = Color.red.opacity(0.095)
+
     private var barScale: CGFloat {
         guard maxTotalPremium > 0 else { return 0 }
         return CGFloat(min(strike.totalPremium / maxTotalPremium, 1))
@@ -354,7 +359,8 @@ struct StrikeRowView: View {
             HStack(spacing: 8) {
                 HStack(spacing: 4) {
                     Text(formatAbbreviatedCurrency(strike.callPremium))
-                        .foregroundColor(.green)
+                        .fontWeight(.semibold)
+                        .foregroundColor(callPremiumColor)
                     Text("/")
                         .foregroundColor(.secondary)
                     Text(formatNumber(strike.callVolume))
@@ -372,7 +378,8 @@ struct StrikeRowView: View {
 
                 HStack(spacing: 4) {
                     Text(formatAbbreviatedCurrency(strike.putPremium))
-                        .foregroundColor(.red)
+                        .fontWeight(.semibold)
+                        .foregroundColor(putPremiumColor)
                     Text("/")
                         .foregroundColor(.secondary)
                     Text(formatNumber(strike.putVolume))
@@ -395,13 +402,13 @@ struct StrikeRowView: View {
                 ZStack {
                     if callBarWidth > 0 {
                         Rectangle()
-                            .fill(Color.green.opacity(0.12))
+                            .fill(callBarColor)
                             .frame(width: callBarWidth, height: geometry.size.height)
                             .position(x: centerX - callBarWidth / 2, y: geometry.size.height / 2)
                     }
                     if putBarWidth > 0 {
                         Rectangle()
-                            .fill(Color.red.opacity(0.12))
+                            .fill(putBarColor)
                             .frame(width: putBarWidth, height: geometry.size.height)
                             .position(x: centerX + putBarWidth / 2, y: geometry.size.height / 2)
                     }

@@ -167,7 +167,7 @@ struct StrikeListView: View {
                     } label: {
                         Label(
                             configService.strikeExpirationFilter == .all ? "Exp" : "\(configService.strikeExpirationFilter.label)d",
-                            systemImage: "calendar"
+                            systemImage: "hourglass"
                         )
                     }
                 }
@@ -240,20 +240,11 @@ struct StrikeListView: View {
 
     private func passesExpirationFilter(_ strike: StrikeSummary) -> Bool {
         guard let days = configService.strikeExpirationFilter.days else { return true }
-        guard let expirationDate = parseExpirationDate(strike.expiration) else { return true }
-
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        guard let endDate = calendar.date(byAdding: .day, value: days, to: today) else { return true }
-
-        let expirationDay = calendar.startOfDay(for: expirationDate)
-        return expirationDay >= today && expirationDay <= endDate
+        return ExpirationFiltering.isWithinDaysFromToday(strike.expiration, days: days)
     }
 
     private func parseExpirationDate(_ expiration: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.date(from: expiration)
+        ExpirationFiltering.parseExpirationDate(expiration)
     }
 
     private func sortStrikes(_ strikes: [StrikeSummary]) -> [StrikeSummary] {

@@ -74,6 +74,27 @@ struct SummaryListView: View {
                         } label: {
                             Label("Sort", systemImage: "arrow.up.arrow.down")
                         }
+
+                        Menu {
+                            ForEach(AnalyzeDTEFilter.allCases, id: \.self) { filter in
+                                Button(action: {
+                                    configService.analyzeDteFilter = filter
+                                }) {
+                                    HStack {
+                                        Text(filter == .all ? "All" : "\(filter.label) days")
+                                        if configService.analyzeDteFilter == filter {
+                                            Spacer()
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            Label(
+                                configService.analyzeDteFilter == .all ? "DTE" : "\(configService.analyzeDteFilter.label)d",
+                                systemImage: "hourglass"
+                            )
+                        }
                     }
                 }
                 

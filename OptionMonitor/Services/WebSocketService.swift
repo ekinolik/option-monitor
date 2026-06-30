@@ -24,14 +24,15 @@ class WebSocketService: ObservableObject {
     private let authService = AuthenticationService.shared
     
     init() {
-        // Listen for config changes (host, port, date, ticker)
+        // Listen for config changes (host, port, date, ticker, DTE)
         Publishers.CombineLatest4(
             configService.$host,
             configService.$port,
             configService.$selectedDate,
             configService.$ticker
         )
-        .sink { [weak self] _, _, _, _ in
+        .combineLatest(configService.$analyzeDteFilter)
+        .sink { [weak self] _, _ in
             // Always reconnect when config changes, regardless of current state
             guard let self = self else { return }
             

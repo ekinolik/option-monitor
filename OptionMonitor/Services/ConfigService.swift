@@ -16,6 +16,7 @@ class ConfigService: ObservableObject {
     private let strikeSortOptionKey = "strike_sort_option"
     private let strikeExpirationFilterKey = "strike_expiration_filter"
     private let strikeAggregateByStrikeKey = "strike_aggregate_by_strike"
+    private let analyzeDteFilterKey = "analyze_dte_filter"
     
     private let defaultHost = "localhost"
     private let defaultPort = "8080"
@@ -109,6 +110,12 @@ class ConfigService: ObservableObject {
             UserDefaults.standard.set(strikeAggregateByStrike, forKey: strikeAggregateByStrikeKey)
         }
     }
+
+    @Published var analyzeDteFilter: AnalyzeDTEFilter {
+        didSet {
+            UserDefaults.standard.set(analyzeDteFilter.rawValue, forKey: analyzeDteFilterKey)
+        }
+    }
     
     var isDevBundle: Bool {
         Bundle.main.bundleIdentifier == "io.chaossignal.optionmonitor.dev"
@@ -153,6 +160,13 @@ class ConfigService: ObservableObject {
             self.strikeExpirationFilter = expirationFilter
         } else {
             self.strikeExpirationFilter = .all
+        }
+
+        if let rawAnalyzeDte = UserDefaults.standard.string(forKey: analyzeDteFilterKey),
+           let analyzeDte = AnalyzeDTEFilter(rawValue: rawAnalyzeDte) {
+            self.analyzeDteFilter = analyzeDte
+        } else {
+            self.analyzeDteFilter = .all
         }
 
         self.strikeAggregateByStrike = UserDefaults.standard.object(forKey: strikeAggregateByStrikeKey) as? Bool ?? false
@@ -310,10 +324,14 @@ class ConfigService: ObservableObject {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         let dateString = dateFormatter.string(from: selectedDate)
-        components.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "date", value: dateString),
             URLQueryItem(name: "ticker", value: ticker.uppercased())
         ]
+        if let dte = analyzeDteFilter.days {
+            queryItems.append(URLQueryItem(name: "dte", value: String(dte)))
+        }
+        components.queryItems = queryItems
         
         return components.url
     }

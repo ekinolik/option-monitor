@@ -8,6 +8,7 @@ enum TransactionSortOption: String, CaseIterable {
 struct SummaryDetailView: View {
     let summary: OptionSummary
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var configService = ConfigService.shared
     @State private var transactions: [Transaction] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -193,15 +194,23 @@ struct SummaryDetailView: View {
         return formatter.string(from: NSNumber(value: number)) ?? "0"
     }
     
+    private var dteFilteredTransactions: [Transaction] {
+        guard let days = configService.analyzeDteFilter.days else { return transactions }
+        return transactions.filter { transaction in
+            guard let expiration = transaction.optionDetails?.expiration else { return false }
+            return ExpirationFiltering.isWithinDaysFromToday(expiration, days: days)
+        }
+    }
+
     private var sortedTransactions: [Transaction] {
         switch sortOption {
         case .premium:
-            return transactions.sorted { 
-                ($0.volumeWeightedPrice * Double($0.volume) * 100.0) > 
-                ($1.volumeWeightedPrice * Double($1.volume) * 100.0) 
+            return dteFilteredTransactions.sorted {
+                ($0.volumeWeightedPrice * Double($0.volume) * 100.0) >
+                ($1.volumeWeightedPrice * Double($1.volume) * 100.0)
             }
         case .volume:
-            return transactions.sorted { $0.volume > $1.volume }
+            return dteFilteredTransactions.sorted { $0.volume > $1.volume }
         }
     }
     
@@ -218,8 +227,8 @@ struct SummaryDetailView: View {
                 Text("Error: \(error)")
                     .foregroundColor(.red)
                     .font(.caption)
-            } else if transactions.isEmpty {
-                Text("No transactions found")
+            } else if dteFilteredTransactions.isEmpty {
+                Text(transactions.isEmpty ? "No transactions found" : "No transactions within DTE filter")
                     .foregroundColor(.secondary)
                     .font(.caption)
             } else {

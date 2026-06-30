@@ -19,6 +19,7 @@ struct SummaryListView: View {
     @State private var showDatePicker = false
     @State private var showTickerPicker = false
     @State private var showThresholdSettings = false
+    @State private var showStrikeList = false
     @State private var filterByThreshold = false
     @State private var showRegistrationError = false
     
@@ -32,6 +33,10 @@ struct SummaryListView: View {
                 
                 // Header row 3: Connection status bar
                 connectionStatusBar
+
+                if !webSocketService.summaries.isEmpty {
+                    ratiosHeader
+                }
                 
                 // List of summaries
                 if webSocketService.summaries.isEmpty {
@@ -43,12 +48,6 @@ struct SummaryListView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    if !webSocketService.summaries.isEmpty {
-                        ratiosHeader
-                    }
-                }
-                
                 ToolbarItem(placement: .navigationBarLeading) {
                     HStack(spacing: 12) {
                         Button(action: {
@@ -81,6 +80,12 @@ struct SummaryListView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
                         Button(action: {
+                            showStrikeList = true
+                        }) {
+                            Image(systemName: "list.bullet.rectangle")
+                        }
+
+                        Button(action: {
                             webSocketService.reconnect()
                         }) {
                             Image(systemName: "arrow.clockwise")
@@ -110,6 +115,11 @@ struct SummaryListView: View {
             .sheet(isPresented: $showThresholdSettings) {
                 NavigationView {
                     ThresholdSettingsView()
+                }
+            }
+            .sheet(isPresented: $showStrikeList) {
+                NavigationView {
+                    StrikeListView()
                 }
             }
             .alert("Device Registration Error", isPresented: $showRegistrationError) {
@@ -208,14 +218,17 @@ struct SummaryListView: View {
     }
     
     private var ratiosHeader: some View {
-        HStack(spacing: 16) {
-            ratioItem(label: "15m", ratio: fifteenMinuteRatio)
-            ratioItem(label: "1h", ratio: oneHourRatio)
-            ratioItem(label: "Day", ratio: allDayRatio)
+        HStack(spacing: 0) {
+            ratioItem(label: "15m", ratio: fifteenMinuteRatio, premiums: fifteenMinutePremiums)
+            ratioItem(label: "1h", ratio: oneHourRatio, premiums: oneHourPremiums)
+            ratioItem(label: "Day", ratio: allDayRatio, premiums: allDayPremiums)
         }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color(.systemGray6))
     }
     
-    private func ratioItem(label: String, ratio: Double?) -> some View {
+    private func ratioItem(label: String, ratio: Double?, premiums: (call: Double, put: Double)?) -> some View {
         VStack(spacing: 2) {
             Text(label)
                 .font(.caption2)
@@ -230,7 +243,25 @@ struct SummaryListView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+            if let premiums = premiums {
+                HStack(spacing: 2) {
+                    Text(formatAbbreviatedCurrency(premiums.call))
+                        .foregroundColor(.green)
+                    Text("/")
+                        .foregroundColor(.secondary)
+                    Text(formatAbbreviatedCurrency(premiums.put))
+                        .foregroundColor(.red)
+                }
+                .font(.caption2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            } else {
+                Text("--")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
         }
+        .frame(maxWidth: .infinity)
     }
     
     private func ratioColor(for ratio: Double) -> Color {
@@ -255,6 +286,42 @@ struct SummaryListView: View {
     
     private var allDayRatio: Double? {
         calculateRatio(for: nil) // nil means all day
+    }
+
+    private var fifteenMinutePremiums: (call: Double, put: Double)? {
+        calculatePremiums(for: 15 * 60)
+    }
+
+    private var oneHourPremiums: (call: Double, put: Double)? {
+        calculatePremiums(for: 60 * 60)
+    }
+
+    private var allDayPremiums: (call: Double, put: Double)? {
+        calculatePremiums(for: nil)
+    }
+
+    private func calculatePremiums(for timeWindowSeconds: Int?) -> (call: Double, put: Double)? {
+        let now = Date()
+        let cutoffDate: Date?
+
+        if let seconds = timeWindowSeconds {
+            cutoffDate = now.addingTimeInterval(-Double(seconds))
+        } else {
+            cutoffDate = nil
+        }
+
+        let relevantSummaries: [OptionSummary]
+        if let cutoff = cutoffDate {
+            relevantSummaries = webSocketService.summaries.filter { $0.periodStart >= cutoff }
+        } else {
+            relevantSummaries = webSocketService.summaries
+        }
+
+        guard !relevantSummaries.isEmpty else { return nil }
+
+        let call = relevantSummaries.reduce(0) { $0 + $1.callPremium }
+        let put = relevantSummaries.reduce(0) { $0 + $1.putPremium }
+        return (call, put)
     }
     
     private func calculateRatio(for timeWindowSeconds: Int?) -> Double? {
